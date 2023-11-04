@@ -1,0 +1,48 @@
+#experiment name
+exp_name: test
+
+#hyperparameters
+hyperparams:
+  lr: 0.001
+  bs: 512
+  iterations: &iterations 10000
+  num_epochs: 1
+
+#dataset
+data:
+  train:
+    name: imgloader
+    image_path: /home/bharathsk/projects/nerf/data/images/weic2216b.jpg
+    size: *iterations
+  val:
+    name: testloader
+    image_path: /home/bharathsk/projects/nerf/data/images/weic2216b.jpg
+  test:
+    name: testloader
+    image_path: /home/bharathsk/projects/nerf/data/images/weic2216b.jpg
+
+#embeddings
+embddings: 
+  name: 'sinusoidal'
+  num_freq: &num_freq 10
+
+#model definition
+model:
+  name: 'imgdigest'
+  input_dim: *num_freq * 4
+  hidden_dim: 256
+  output_dim: 3
+  num_hdden_layers: 8
+
+#loss functions:
+loss:
+  name: 'mse'
+
+#metrics
+metrics:
+  list: ['mse', 'psnr', 'ssim']
+
+#paths
+paths:
+  exp_dir: /home/bharathsk/projects/nerf/exps
+  data_dir: /home/bharathsk/projects/nerf/data
