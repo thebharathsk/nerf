@@ -1,15 +1,15 @@
 from models.imgdigest import imgdigest as imgdigest
 
-def get_model(model_args):
+def get_model(model_config):
     """Get model
 
-    Args:
-        model_args: arguments for model
+    config:
+        model_config: arguments for model
 
     Returns:
         model
     """
-    if model_args['model'] == 'imgdigest':
-        return imgdigest(model_args)
+    if model_config['name'] == 'imgdigest':
+        return imgdigest(model_config)
     else:
-        raise NotImplementedError(f'Model {model_args["name"]} not implemented')
+        raise NotImplementedError(f'Model {model_config["name"]} not implemented')

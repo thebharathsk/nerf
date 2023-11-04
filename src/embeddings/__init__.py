@@ -1,13 +1,13 @@
 from embeddings.embeddings import SinusoidalEmbeddings as SinusoidalEmbeddings
 
-def get_embeddings(embedding_args):
+def get_embeddings(embedding_config):
     """Function to get embeddings
-        embedding_args: arguments for embeddings
+        embedding_config: arguments for embeddings
     """
     #get embeddings
-    if embedding_args['type'] == 'sinusoidal':
-        embeddings = SinusoidalEmbeddings(embedding_args)
+    if embedding_config['name'] == 'sinusoidal':
+        embeddings = SinusoidalEmbeddings(embedding_config)
     else:
-        raise NotImplementedError(f'Embeddings {embedding_args["name"]} is not implemented')
+        raise NotImplementedError(f'Embeddings {embedding_config["name"]} is not implemented')
     
     return embeddings
