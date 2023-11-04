@@ -1,5 +1,5 @@
 #experiment name
-exp_name: test
+exp_name: continuous_sampling
 
 #hyperparameters
 hyperparams:
@@ -42,10 +42,11 @@ loss:
 #optimizer
 optimizer:
   name: 'adam'
+  weight_decay: 0.0001
 
 #metrics
 metrics:
-  list: ['mse', 'psnr', 'ssim']
+  list: ['mse', 'psnr', 'lpips', 'ssim']
 
 #paths
 paths:

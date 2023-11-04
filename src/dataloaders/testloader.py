@@ -11,6 +11,7 @@ class testloader(Dataset):
         """
         #load image
         self.image = cv2.imread(data_config['image_path'])
+        self.image = self.image.astype('float32')
         
         #resolution of image
         self.resolution = self.image.shape[0:2]
@@ -31,9 +32,9 @@ class testloader(Dataset):
         x = idx - y*self.resolution[1]
         
         #normalize x, y coordinate
-        x_norm, y_norm = x/self.resolution[0], y/self.resolution[1]
+        x_norm, y_norm = x/self.resolution[1], y/self.resolution[0]
         coords_t = torch.Tensor([x_norm, y_norm])
-        coords_t = 2*coords_t-1
+        coords_t = (coords_t-0.5)/0.5
         coords_unnorm_t = torch.Tensor([x, y])
         
         #get pixel value
@@ -41,7 +42,7 @@ class testloader(Dataset):
         
         #pack data into a batch
         data = {'coords': coords_t.float(), 
-                'coords_unnorm': coords_unnorm_t.float(),
+                'coords_unnorm': coords_unnorm_t.long(),
                 'colors': colors_t.float()}
-        
+                
         return data

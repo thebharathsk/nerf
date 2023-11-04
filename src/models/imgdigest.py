@@ -21,7 +21,6 @@ class imgdigest(nn.Module):
 
         #add output layer
         self.fc.append(nn.Linear(model_config['hidden_dim'], model_config['output_dim']))
-        self.fc.append(nn.ReLU())
         
         #initialize activation
         self.activation = nn.Sigmoid()

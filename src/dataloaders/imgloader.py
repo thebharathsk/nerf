@@ -1,3 +1,4 @@
+import math
 import cv2 as cv2
 import numpy as np
 
@@ -11,6 +12,7 @@ class imgloader(Dataset):
         """
         #load image
         self.image = cv2.imread(data_config['image_path'])
+        self.image = self.image.astype('float32')
         
         #resolution of image
         self.resolution = self.image.shape[0:2]
@@ -27,19 +29,26 @@ class imgloader(Dataset):
         """Get item from dataset
         """
         #randomly sample x, y coordinate
-        x, y = np.random.randint(0, self.resolution[0]), \
-                np.random.randint(0, self.resolution[1])
+        x_norm, y_norm = np.random.uniform(-1,1), \
+                np.random.uniform(-1,1)
         
-        #normalize x, y coordinate
-        x_norm, y_norm = x/self.resolution[0], y/self.resolution[1]
-        coords_t = torch.Tensor([x_norm, y_norm])
-        coords_t = 2*coords_t-1
+        #truncate x, y coordinate
+        x_norm, y_norm = np.clip(x_norm, -1, 1), np.clip(y_norm, -1, 1)
+        
+        #get unnormalized x, y coordinate
+        x_unnorm, y_unnorm = math.floor(((x_norm+1)/2)*self.resolution[1]), \
+                math.floor(((y_norm+1)/2)*self.resolution[0])
+                
+        #convert data to tensors
+        coords_norm_t = torch.Tensor([x_norm, y_norm])
+        coords_unnorm_t = torch.Tensor([x_unnorm, y_unnorm])
         
         #get pixel value
-        colors_t = torch.from_numpy(self.image[x, y]/255.0)
+        colors_t = torch.from_numpy(self.image[y_unnorm, x_unnorm]/255.0)
         
         #pack data into a batch
-        data = {'coords': coords_t.float(), 
+        data = {'coords': coords_norm_t.float(),
+                'coords_unnorm': coords_unnorm_t.long(),
                 'colors': colors_t.float()}
         
         return data
