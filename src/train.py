@@ -2,6 +2,7 @@ import os
 import argparse
 import yaml
 import lightning as L
+from lightning.pytorch.loggers import CometLogger
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from lightning.pytorch.utilities.types import STEP_OUTPUT, OptimizerLRScheduler
@@ -87,14 +88,21 @@ def main(config):
     test_dataloader = get_dataloader('test', config['data']['test'], 
                                      config['hyperparams'])
     
+    #define logger
+    comet_logger = CometLogger(project_name="nerf/image",
+                               save_dir=os.path.join(config['paths']['exp_dir'], config['exp_name']),
+                               experiment_name=config['exp_name'])
+    
     #initialize lightning module
     nerf_engine = NeRFEngine(config)
-        
+    
     #initialize trainer
     trainer = L.Trainer(max_epochs=config['hyperparams']['epochs'],
                          accelerator='cuda', 
                          devices=[0,1], 
-                         precision='16')
+                         precision='16',
+                         logger=comet_logger,
+                         log_every_n_steps=50000)
     
     #start training
     trainer.fit(nerf_engine, train_dataloaders=train_dataloader,
