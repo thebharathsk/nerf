@@ -106,6 +106,9 @@ class NeRFEngine(L.LightningModule):
         image_pil = image_pil.astype('uint8')
         image_pil = Image.fromarray(image_pil[:,:,::-1])
         self.logger.experiment.log_image(image_pil, name='val_reconstructed_image')
+        
+        #save image
+        image_pil.save(os.path.join(self.logger.save_dir, 'val_reconstructed.png'))
     
     def on_test_epoch_start(self):
         #create arrays to hold images
@@ -151,6 +154,9 @@ class NeRFEngine(L.LightningModule):
         image_pil = image_pil.astype('uint8')
         image_pil = Image.fromarray(image_pil[:,:,::-1])
         self.logger.experiment.log_image(image_pil, name='test_reconstructed_image')
+        
+        #save image
+        image_pil.save(os.path.join(self.logger.save_dir, 'test_reconstructed.png'))
     
     def configure_optimizers(self):
         if self.config['optimizer']['name'] == "adam":
@@ -170,15 +176,18 @@ def main(config):
             config: configuration for training
     """
     #initialize dataloaders
-    train_dataloader = get_dataloader('train', config['data']['train'], 
+    train_dataloader = get_dataloader('train',
+                                      config['data']['train'], 
                                       config['hyperparams'])
-    val_dataloader = get_dataloader('val', config['data']['val'], 
+    val_dataloader = get_dataloader('val',
+                                    config['data']['val'], 
                                     config['hyperparams'])
-    test_dataloader = get_dataloader('test', config['data']['test'], 
+    test_dataloader = get_dataloader('test',
+                                     config['data']['test'], 
                                      config['hyperparams'])
     
     #define logger
-    comet_logger = CometLogger(project_name="nerf/image",
+    comet_logger = CometLogger(project_name="nerf-image",
                                save_dir=os.path.join(config['paths']['exp_dir'], config['exp_name']),
                                experiment_name=config['exp_name'])
     

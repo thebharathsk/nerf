@@ -1,10 +1,10 @@
 #experiment name
-exp_name: continuous_sampling
+exp_name: messi_lr_5e-3_bs_4096
 
 #hyperparameters
 hyperparams:
   lr: 0.001
-  bs: 512
+  bs: 4096
   iterations: 10000000
   epochs: 1
   num_workers: 8
@@ -13,24 +13,27 @@ hyperparams:
 data:
   train:
     name: imgloader
-    image_path: /home/bharathsk/projects/nerf/data/images/weic2216b.jpg
+    image_path: /home/bharathsk/projects/nerf/data/images/wp5643991.jpg
     size: 10000000
   val:
     name: testloader
-    image_path: /home/bharathsk/projects/nerf/data/images/weic2216b.jpg
+    image_path: /home/bharathsk/projects/nerf/data/images/wp5643991.jpg
   test:
     name: testloader
-    image_path: /home/bharathsk/projects/nerf/data/images/weic2216b.jpg
+    image_path: /home/bharathsk/projects/nerf/data/images/wp5643991.jpg
+  analysis:
+    name: testloader
+    image_path: /home/bharathsk/projects/nerf/data/images/wp5643991.jpg
 
 #embeddings
 embeddings: 
   name: 'sinusoidal'
-  num_freq: 10
+  num_freq: 20
 
 #model definition
 model:
   name: 'imgdigest'
-  input_dim: 40
+  input_dim: 80
   hidden_dim: 256
   output_dim: 3
   num_hidden_layers: 8
@@ -42,7 +45,7 @@ loss:
 #optimizer
 optimizer:
   name: 'adam'
-  weight_decay: 0.0001
+  weight_decay: 0.000001
 
 #metrics
 metrics:
@@ -52,3 +55,4 @@ metrics:
 paths:
   exp_dir: /home/bharathsk/projects/nerf/exps
   data_dir: /home/bharathsk/projects/nerf/data
+  resume: /home/bharathsk/projects/nerf/exps/lr_5e-3_bs_4096/nerf/image/67990ff3dba3433bbec1033fc45f1141/checkpoints/epoch=0-step=1221.ckpt
