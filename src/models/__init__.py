@@ -1,4 +1,5 @@
 from models.imgdigest import imgdigest as imgdigest
+from models.nerf import NeRF as NeRF
 
 def get_model(model_config):
     """Get model
@@ -11,5 +12,7 @@ def get_model(model_config):
     """
     if model_config['name'] == 'imgdigest':
         return imgdigest(model_config)
+    elif model_config['name'] == 'nerf':
+        return NeRF(model_config)
     else:
         raise NotImplementedError(f'Model {model_config["name"]} not implemented')
