@@ -4,7 +4,7 @@ exp_name: drop_1
 #hyperparameters
 hyperparams:
   lr: 0.001
-  rays: 4096
+  num_rays: 4096
   samples_coarse: 64
   samples_fine: 128
   iterations: 10000000
@@ -17,22 +17,22 @@ data:
     name: colmap
     image_path: /home/bharathsk/datasets/drop/frames/drop_2/
     sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
-    size: 10000000
+    size: NULL
   val:
     name: colmap
     image_path: /home/bharathsk/datasets/drop/frames/drop_2/
     sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
-    size: None
+    size: NULL
   test:
     name: colmap
     image_path: /home/bharathsk/datasets/drop/frames/drop_2/
     sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
-    size: None
+    size: NULL
   analysis:
     name: colmap
     image_path: /home/bharathsk/datasets/drop/frames/drop_2/
     sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
-    size: None
+    size: NULL
 
 #embeddings
 embeddings: 

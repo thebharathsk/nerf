@@ -1,4 +1,6 @@
 import os
+import torch
+from tqdm import tqdm
 import cv2 as cv2
 import numpy as np
 
@@ -180,7 +182,7 @@ def get_ray_data(image_path, workspace_path):
     camera_centers = -np.linalg.inv(extrinsics_transformed[:, 0:3, 0:3])@extrinsics_transformed[:, 0:3, 3:]
     camera_centers = camera_centers[:,:,0]
     rays_o = np.expand_dims(camera_centers, axis=(1, 2))
-    rays_o = np.broadcast_to(rays_o, (num_cameras, h, w, 3))
+    rays_o = np.broadcast_to(rays_o, (num_cameras, h, w, 3)).copy()
     
     #compute ray directions
     rays_d = np.stack([(x-K[0][2])/K[0][0], (y-K[1][2])/K[1][1], np.ones_like(x)], -1) # (h, w, 3)
@@ -190,10 +192,25 @@ def get_ray_data(image_path, workspace_path):
     rays_d = rays_d/np.linalg.norm(rays_d, axis=1, keepdims=True) #normalize ray directions (N, 3, h*w)
     rays_d = np.reshape(rays_d, (num_cameras, 3, h, w)) # (N, 3, h, w)
     rays_d = np.transpose(rays_d, (0,2,3,1)) # (num_cameras, h, w, 3)
-            
+    
+    #compute min and max t values
+    t_min = (-1 - rays_o[...,2:])/rays_d[...,2:]
+    t_max = (1 - rays_o[...,2:])/rays_d[...,2:]
+    t_min = np.maximum(t_min, 0)
+    t_max = np.maximum(t_max, 0)
+    
+    t_range = np.concatenate([t_min, t_max], axis=-1)
+    
     #get rgb data
     rgb = np.zeros((num_cameras, h, w, 3))
-    for i, image_path in enumerate(image_paths):
-        rgb[i] = np.array(cv2.imread(image_path)[:,:,::-1])/255.0
+    print('Loading images...')
+    for i, image_path in tqdm(enumerate(image_paths)):
+        rgb[i] = np.array(cv2.imread(image_path)[:,:,::-1], 'float')/255.0
+        
+    #convert into torch tensors
+    rays_o = torch.from_numpy(rays_o).contiguous().float()
+    rays_d = torch.from_numpy(rays_d).contiguous().float()
+    rgb = torch.from_numpy(rgb).contiguous().float()
+    t_range = torch.from_numpy(t_range).contiguous().float()
     
-    return rays_o, rays_d, rgb
+    return rays_o, rays_d, rgb, t_range

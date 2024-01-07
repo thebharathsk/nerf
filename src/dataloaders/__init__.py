@@ -27,6 +27,6 @@ def get_dataloader(split, config):
     
     #check if shuffling is needed
     shuffle = True if split == 'train' else False
-    dataloader = DataLoader(dataset, batch_size=config['hyperparams']['rays'], shuffle=shuffle, num_workers=config['hyperparams']['num_workers'])
+    dataloader = DataLoader(dataset, batch_size=config['hyperparams']['num_rays'], shuffle=shuffle, num_workers=config['hyperparams']['num_workers'])
     
     return dataloader
