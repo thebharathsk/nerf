@@ -1,29 +1,32 @@
 from dataloaders.imgloader import imgloader as imgloader
 from dataloaders.testloader import testloader as testloader
 from dataloaders.rowloader import rowloader as rowloader
+from dataloaders.colmap import COLMAP as colmap
 
 from torch.utils.data import DataLoader
 
-def get_dataloader(mode, data_config, hyperparams):
+def get_dataloader(split, config):
     """Get dataloader
-        mode: train, val, or test
-        data_config: arguments for data
+        split: train, val, or test
+        config: arguments for data
         hyperparams: hyperparameters for training
     """
     #get dataset name
-    dataset_name = data_config['name']
+    dataset_name = config['data'][split]['name']
 
     if dataset_name == 'imgloader':
-        dataset = imgloader(data_config)
+        dataset = imgloader(config, split)
     elif dataset_name == 'testloader':
-        dataset = testloader(data_config)
+        dataset = testloader(config, split)
     elif dataset_name == 'rowloader':
-        dataset = rowloader(data_config)
+        dataset = rowloader(config, split)
+    elif dataset_name == 'colmap':
+        dataset = colmap(config, split)
     else:
-        raise NotImplementedError(f'Model {data_config["name"]} not implemented')
+        raise NotImplementedError(f'Model {dataset_name} not implemented')
     
     #check if shuffling is needed
-    shuffle = True if mode == 'train' else False
-    dataloader = DataLoader(dataset, batch_size=hyperparams['bs'], shuffle=shuffle, num_workers=hyperparams['num_workers'])
+    shuffle = True if split == 'train' else False
+    dataloader = DataLoader(dataset, batch_size=config['hyperparams']['rays'], shuffle=shuffle, num_workers=config['hyperparams']['num_workers'])
     
     return dataloader

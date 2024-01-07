@@ -1,18 +1,18 @@
 from models.imgdigest import imgdigest as imgdigest
 from models.nerf import NeRF as NeRF
 
-def get_model(model_config):
+def get_model(config):
     """Get model
 
     config:
-        model_config: arguments for model
+        config: arguments for model
 
     Returns:
         model
     """
-    if model_config['name'] == 'imgdigest':
-        return imgdigest(model_config)
-    elif model_config['name'] == 'nerf':
-        return NeRF(model_config)
+    if config['model']['name'] == 'imgdigest':
+        return imgdigest(config)
+    elif config['model']['name'] == 'nerf':
+        return NeRF(config)
     else:
-        raise NotImplementedError(f'Model {model_config["name"]} not implemented')
+        raise NotImplementedError(f'Model {config["model"]["name"]} not implemented')

@@ -10,27 +10,27 @@ class NeRF(nn.Module):
         self.intermediate_layers = nn.ModuleList()
         for i in range(config['model']['num_intermediate_layers']):
             if i == 0:
-                self.intermediate_layers.append(LinearReLU(config['embeddings']['num_freq_loc']*3, config['model']['hidden_size']))
+                self.intermediate_layers.append(LinearReLU(config['embeddings']['num_freq_loc']*3, config['model']['hidden_dim']))
             else:
-                self.intermediate_layers.append(LinearReLU(config['model']['hidden_size'], config['model']['hidden_size']))
+                self.intermediate_layers.append(LinearReLU(config['model']['hidden_dim'], config['model']['hidden_dim']))
                 
         #final layers
         self.final_layers = nn.ModuleList()
         for i in range(config['model']['num_final_layers']):
             if i == 0:
-                self.final_layers.append(LinearReLU(config['model']['hidden_size']+config['embeddings']['num_freq_loc']*3, config['model']['hidden_size']))
+                self.final_layers.append(LinearReLU(config['model']['hidden_dim']+config['embeddings']['num_freq_loc']*3, config['model']['hidden_dim']))
             else:
-                self.final_layers.append(LinearReLU(config['model']['hidden_size'], config['model']['hidden_size']))
+                self.final_layers.append(LinearReLU(config['model']['hidden_dim'], config['model']['hidden_dim']))
             
         #volume density output layers
-        self.sigma_output = nn.LinearReLU(config['model']['hidden_size'], 1)
+        self.sigma_output = LinearReLU(config['model']['hidden_dim'], 1)
         
         #radiance output layers
-        self.features = nn.Linear(config['model']['hidden_size'], config['model']['hidden_size'])
+        self.features = nn.Linear(config['model']['hidden_dim'], config['model']['hidden_dim'])
         
         self.rgb_output = nn.Sequential(
-            nn.LinearReLU(config['model']['hidden_size']+config['embeddings']['num_freq_dir']*3, config['model']['hidden_size']//2),
-            nn.Linear(config['model']['hidden_size']//2, 3),
+            LinearReLU(config['model']['hidden_dim']+config['embeddings']['num_freq_dir']*3, config['model']['hidden_dim']//2),
+            nn.Linear(config['model']['hidden_dim']//2, 3),
             nn.Sigmoid()
         )
     def forward(self, x):

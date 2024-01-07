@@ -1,9 +1,9 @@
 import torch.nn as nn
 
 class imgdigest(nn.Module):
-    def __init__(self, model_config):
+    def __init__(self, config):
         """Constructor for imgdigest
-            model_config: arguments for model
+            config: arguments for model
         """
         super(imgdigest, self).__init__()
         
@@ -11,16 +11,16 @@ class imgdigest(nn.Module):
         self.fc = nn.ModuleList()
         
         #add input layer
-        self.fc.append(nn.Linear(model_config['input_dim'], model_config['hidden_dim']))
+        self.fc.append(nn.Linear(config['model']['input_dim'], config['model']['hidden_dim']))
         self.fc.append(nn.ReLU())
         
         #add hidden layers
-        for _ in range(model_config['num_hidden_layers']):
-            self.fc.append(nn.Linear(model_config['hidden_dim'], model_config['hidden_dim']))
+        for _ in range(config['model']['num_hidden_layers']):
+            self.fc.append(nn.Linear(config['model']['hidden_dim'], config['model']['hidden_dim']))
             self.fc.append(nn.ReLU())
 
         #add output layer
-        self.fc.append(nn.Linear(model_config['hidden_dim'], model_config['output_dim']))
+        self.fc.append(nn.Linear(config['model']['hidden_dim'], config['model']['output_dim']))
         
         #initialize activation
         self.activation = nn.Sigmoid()

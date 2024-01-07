@@ -21,18 +21,18 @@ class NeRFEngine(L.LightningModule):
         self.config = config
         
         #initialize embeddings
-        self.embeddings = get_embeddings(config['embeddings'])
+        self.embeddings = get_embeddings(config)
         
         #initialize model
-        self.model = get_model(config['model'])
+        self.model = get_model(config)
         
         #initialize loss function
-        self.loss = get_loss(config['loss'])
+        self.loss = get_loss(config)
         
         #initialize metrics
-        self.train_metrics = get_metrics(config['metrics'], prefix='train')
-        self.val_metrics = get_metrics(config['metrics'], prefix='val')
-        self.test_metrics = get_metrics(config['metrics'], prefix='test')
+        self.train_metrics = get_metrics(config, prefix='train')
+        self.val_metrics = get_metrics(config, prefix='val')
+        self.test_metrics = get_metrics(config, prefix='test')
     
     def on_train_start(self):
         #log hyperparameters

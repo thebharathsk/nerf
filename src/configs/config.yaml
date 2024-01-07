@@ -1,10 +1,12 @@
 #experiment name
-exp_name: messi_lr_5e-3_bs_4096
+exp_name: drop_1
 
 #hyperparameters
 hyperparams:
   lr: 0.001
-  bs: 4096
+  rays: 4096
+  samples_coarse: 64
+  samples_fine: 128
   iterations: 10000000
   epochs: 1
   num_workers: 8
@@ -12,31 +14,38 @@ hyperparams:
 #dataset
 data:
   train:
-    name: imgloader
-    image_path: /home/bharathsk/projects/nerf/data/images/wp5643991.jpg
+    name: colmap
+    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
     size: 10000000
   val:
-    name: testloader
-    image_path: /home/bharathsk/projects/nerf/data/images/wp5643991.jpg
+    name: colmap
+    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    size: None
   test:
-    name: testloader
-    image_path: /home/bharathsk/projects/nerf/data/images/wp5643991.jpg
+    name: colmap
+    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    size: None
   analysis:
-    name: testloader
-    image_path: /home/bharathsk/projects/nerf/data/images/wp5643991.jpg
+    name: colmap
+    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    size: None
 
 #embeddings
 embeddings: 
   name: 'sinusoidal'
-  num_freq: 20
+  num_freq_loc: 20
+  num_freq_dir: 10
 
 #model definition
 model:
-  name: 'imgdigest'
-  input_dim: 80
+  name: 'nerf'
   hidden_dim: 256
-  output_dim: 3
-  num_hidden_layers: 8
+  num_intermediate_layers: 6
+  num_final_layers: 2
 
 #loss functions:
 loss:
