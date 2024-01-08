@@ -2,8 +2,19 @@ import torch
 
 def sampler(rays, num_samples, weights=None, fine=False):
     if fine == False:
-        t_vals = torch.linspace(rays['ray_bds'][...,0], rays['ray_bds'][...,1], num_samples)
-        print(t_vals.shape)
+        #sample points
+        gen_diff = torch.linspace(0., 1., num_samples).unsqueeze(0).unsqueeze(-1) #1xTx1
+        t_start = (rays['ray_bds'][...,0]).unsqueeze(-1).unsqueeze(-1) #Rx1x1
+        t_diff = (rays['ray_bds'][...,1] - rays['ray_bds'][...,0]).unsqueeze(-1).unsqueeze(-1) #Rx1x1
+        t_sampled = t_start + gen_diff * t_diff #RxTx1
+        rays_o = rays['ray_o'].unsqueeze(1) #Rx1x3
+        rays_d = rays['ray_d'].unsqueeze(1) #Rx1x3
+        locs = rays_o + t_sampled * rays_d #RxTx3
+        
+        #convert directions to same shape as pts
+        dirs = rays_d.expand(locs.shape)
+        
+        return locs, dirs
         
     elif fine == True and weights is None:
         raise ValueError('weights must be provided if fine is True')

@@ -10,7 +10,7 @@ class NeRF(nn.Module):
         self.intermediate_layers = nn.ModuleList()
         for i in range(config['model']['num_intermediate_layers']):
             if i == 0:
-                self.intermediate_layers.append(LinearReLU(config['embeddings']['num_freq_loc']*3, config['model']['hidden_dim']))
+                self.intermediate_layers.append(LinearReLU(config['embeddings']['num_freq_loc']*6, config['model']['hidden_dim']))
             else:
                 self.intermediate_layers.append(LinearReLU(config['model']['hidden_dim'], config['model']['hidden_dim']))
                 
@@ -18,7 +18,7 @@ class NeRF(nn.Module):
         self.final_layers = nn.ModuleList()
         for i in range(config['model']['num_final_layers']):
             if i == 0:
-                self.final_layers.append(LinearReLU(config['model']['hidden_dim']+config['embeddings']['num_freq_loc']*3, config['model']['hidden_dim']))
+                self.final_layers.append(LinearReLU(config['model']['hidden_dim']+config['embeddings']['num_freq_loc']*6, config['model']['hidden_dim']))
             else:
                 self.final_layers.append(LinearReLU(config['model']['hidden_dim'], config['model']['hidden_dim']))
             
@@ -29,22 +29,24 @@ class NeRF(nn.Module):
         self.features = nn.Linear(config['model']['hidden_dim'], config['model']['hidden_dim'])
         
         self.rgb_output = nn.Sequential(
-            LinearReLU(config['model']['hidden_dim']+config['embeddings']['num_freq_dir']*3, config['model']['hidden_dim']//2),
+            LinearReLU(config['model']['hidden_dim']+config['embeddings']['num_freq_dir']*6, config['model']['hidden_dim']//2),
             nn.Linear(config['model']['hidden_dim']//2, 3),
             nn.Sigmoid()
         )
-    def forward(self, x):
-        #get location and direction embeddings
-        x_loc, x_dirs = x['loc'], x['dir']
-        
+    def forward(self, x_locs, x_dirs):
         #intermediate layers
-        y = self.intermediate_layers(x_loc)
+        for i, layer in enumerate(self.intermediate_layers):
+            if i == 0:
+                y = layer(x_locs)
+            else:
+                y = layer(y)
         
         #append position embeddings
-        y = torch.cat([y, x_loc], dim=-1)
+        y = torch.cat([y, x_locs], dim=-1)
         
         #final layers
-        y = self.final_layers(y)
+        for layer in self.final_layers:
+            y = layer(y)
         
         #estimate volume density
         sigma = self.sigma_output(y)

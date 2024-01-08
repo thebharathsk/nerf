@@ -30,8 +30,18 @@ def main(config):
     batch = next(iter(train_dataloader))
     
     #sample along rays
-    sampler(batch, config['hyperparams']['num_samples_coarse'], fine=False)
+    locs, dirs = sampler(batch, config['hyperparams']['num_samples_coarse'], fine=False)
+    print(locs.shape, dirs.shape)
     
+    #get embeddings
+    locs_emb, dirs_emb = embeddings(locs, dirs)
+    print(locs_emb.shape, dirs_emb.shape)
+    
+    #pass through model
+    sigma, rgb = model(locs_emb, dirs_emb)
+    print(sigma.shape, rgb.shape)
+    print(sigma.min(), sigma.max())
+    print(rgb.min(), rgb.max())
     
     # for i, batch in enumerate(train_dataloader):
     #     if i > 5:

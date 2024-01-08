@@ -34,10 +34,10 @@ class SinusoidalEmbeddings(nn.Module):
         #aggregate embeddings
         locs_embeddings = torch.cat([locs_embeddings_sin, locs_embeddings_cos], dim=-1) #RxTx3x2F_loc
         locs_embeddings = locs_embeddings.permute(0, 1, 3, 2).contiguous() #RxTx2F_locx3
-        locs_embeddings = locs_embeddings.view(locs_embeddings.shape[0], -1) #RxTx6F_loc
+        locs_embeddings = locs_embeddings.view(locs_embeddings.shape[0], locs_embeddings.shape[1], -1) #RxTx6F_loc
         
         dirs_embeddings = torch.cat([dirs_embeddings_sin, dirs_embeddings_cos], dim=-1) #RxTx2x2F_dir
         dirs_embeddings = dirs_embeddings.permute(0, 1, 3, 2).contiguous() #RxTx2F_dirx2
-        dirs_embeddings = dirs_embeddings.view(dirs_embeddings.shape[0], -1) #RxTx4F_dir
+        dirs_embeddings = dirs_embeddings.view(dirs_embeddings.shape[0], dirs_embeddings.shape[1], -1) #RxTx4F_dir
         
         return locs_embeddings, dirs_embeddings

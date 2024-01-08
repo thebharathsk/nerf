@@ -9,4 +9,4 @@ class LinearReLU(nn.Module):
         )
         
     def forward(self, x):
-        return self.lin_relu(self.linear(x))
+        return self.lin_relu(x)

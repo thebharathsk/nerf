@@ -37,8 +37,8 @@ data:
 #embeddings
 embeddings: 
   name: 'sinusoidal'
-  num_freq_loc: 20
-  num_freq_dir: 10
+  num_freq_loc: 10
+  num_freq_dir: 4
 
 #model definition
 model:
