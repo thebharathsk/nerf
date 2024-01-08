@@ -159,12 +159,20 @@ def transform_3d(extrinsics, points3d):
     
     return extrinsics, points3d, overall_transformation
 
-def get_ray_data(image_path, workspace_path):
+def get_ray_data(image_path, workspace_path, downscale):
     #get intrinsics, extrinsics, points3d and image paths
     K, (h,w) = get_intrinsics(workspace_path)
     extrinsics = get_extrinsics(workspace_path)
     points3d = get_points(workspace_path)
     image_paths = get_image_paths(image_path, workspace_path)
+    
+    #adjust scale of intrinsics
+    K[0,0] /= downscale
+    K[1,1] /= downscale
+    K[0,2] /= downscale
+    K[1,2] /= downscale
+    h = int(h/downscale)
+    w = int(w/downscale)
     
     #find transform to fit point cloud volume into cube of size 2
     extrinsics_transformed, points3d_transformed, transform = transform_3d(extrinsics, points3d)
@@ -205,7 +213,9 @@ def get_ray_data(image_path, workspace_path):
     rgb = np.zeros((num_cameras, h, w, 3))
     print('Loading images...')
     for i, image_path in tqdm(enumerate(image_paths)):
-        rgb[i] = np.array(cv2.imread(image_path)[:,:,::-1], 'float')/255.0
+        img = cv2.imread(image_path)[:,:,::-1]
+        img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
+        rgb[i] = np.array(img, 'float')/255.0
         
     #convert into torch tensors
     rays_o = torch.from_numpy(rays_o).contiguous().float()

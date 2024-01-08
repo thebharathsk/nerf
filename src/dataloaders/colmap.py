@@ -14,16 +14,23 @@ class COLMAP(Dataset):
         #load colmap data
         self.image_path = config['data'][split]['image_path']
         self.workspace_path = config['data'][split]['sparse_recon_path']
+        self.downscale = config['data']['downscale']
                 
         #create an array of rays
         self.rays = {}
-        self.rays['ray_o'], self.rays['ray_d'], self.rays['ray_rgb'], self.rays['ray_bds'] = get_ray_data(self.image_path, self.workspace_path)
+        self.rays['ray_o'], self.rays['ray_d'], self.rays['ray_rgb'], self.rays['ray_bds'] = get_ray_data(self.image_path, self.workspace_path, self.downscale)
+        
+        #select images
+        self.imgs_list = config['data'][split]['imgs_list']
+        if self.imgs_list is not None:
+            for key in self.rays.keys():
+                self.rays[key] = self.rays[key][self.imgs_list]
         
         #some useful variables
         self.num_cameras, self.h, self.w  = self.rays['ray_o'].shape[:3]
         
         #size of dataset
-        self.size = config['data'][split]['size'] if config['data'][split]['size'] is not None else self.num_cameras*self.h*self.w 
+        self.size = min(config['data'][split]['size'], self.num_cameras*self.h*self.w) if config['data'][split]['size'] is not None else self.num_cameras*self.h*self.w 
         
     def __len__(self):
         """Length of dataset
@@ -33,12 +40,11 @@ class COLMAP(Dataset):
     def __getitem__(self, idx):
         """Get item from dataset
         """
-        #select a random camera
-        cam_id = np.random.randint(self.num_cameras)
-        
-        #select a random pixel in the image
-        y, x = np.random.randint(self.h), np.random.randint(self.w)
-        
+        #select camera id, y and x
+        cam_id = idx//(self.h*self.w)
+        y = (idx - cam_id*self.h*self.w)//self.w
+        x = (idx - cam_id*self.h*self.w)%self.w
+                
         #gather data
         batch = {}
         batch['ray_id'] = torch.tensor([cam_id, y, x])

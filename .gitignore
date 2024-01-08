@@ -1,3 +1,7 @@
+#png and jog files
+*.png
+*.jpg
+
 #project related files
 data/
 exps/
