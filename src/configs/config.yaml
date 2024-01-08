@@ -5,8 +5,8 @@ exp_name: drop_1
 hyperparams:
   lr: 0.001
   num_rays: 4096
-  samples_coarse: 64
-  samples_fine: 128
+  num_samples_coarse: 64
+  num_samples_fine: 128
   iterations: 10000000
   epochs: 1
   num_workers: 8
