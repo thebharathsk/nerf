@@ -2,11 +2,12 @@ import os
 import argparse
 import yaml
 import torch
+import wandb
 import cv2 as cv2
 import numpy as np
 
 import lightning as L
-from lightning.pytorch.loggers import CometLogger
+from lightning.pytorch.loggers import WandbLogger
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 
@@ -15,49 +16,98 @@ from models import get_model
 from dataloaders import get_dataloader
 from loss import get_loss
 from metrics import get_metrics
-from utils.utils import sampler, render
+from utils.utils import sampler_coarse, sampler_fine, render, get_time_string, create_log_files
+
+#set wandb entity
+os.environ['WANDB_ENTITY'] = 'bsomayaj'
 
 class NeRFEngine(L.LightningModule):
     def __init__(self, config):
         super().__init__()
+        
+        #store config
         self.config = config
         
-        #initialize embeddings
-        self.embeddings = get_embeddings(config)
+        #create log file
+        self.log_file = create_log_files(self.config['exp']['dir'])[0]
         
-        #initialize model
-        self.model = get_model(config)
+        #initialize embeddings
+        self.embeddings_coarse = get_embeddings(config)
+        self.embeddings_fine = get_embeddings(config)
+        
+        #initialize coarse and fine models
+        self.model_coarse = get_model(config)
+        self.model_fine = get_model(config)
         
         #initialize loss function
-        self.loss_fn = get_loss(config)
-    
-    def on_train_start(self):
-        #log hyperparameters
-        self.logger.experiment.log_parameters(self.config)
+        self.loss_fn_coarse = get_loss(config)
+        self.loss_fn_fine = get_loss(config)
+        
+        #log begging of training
+        self.log_file.info(f'Starting experiment with id {self.config["exp"]["id"]}')
+        self.log_file.info(f'PID = {os.getpid()}')
+        print(f'PID = {os.getpid()}')
         
     def training_step(self, batch, batch_idx):
+        #STEP 1: forward pass through coarse model
         #sample along rays
-        locs, dirs, t_sampled = sampler(batch, self.config['hyperparams']['num_samples_coarse'], fine=False)
+        locs, dirs, t_sampled = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
         
         #get embeddings
-        locs_emb, dirs_emb = self.embeddings(locs, dirs)
+        locs_emb, dirs_emb = self.embeddings_coarse(locs, dirs)
         
         #pass through model
-        sigma, rgb = self.model(locs_emb, dirs_emb)
+        sigma, rgb = self.model_coarse(locs_emb, dirs_emb)
         
         #get rendered colors
-        rgb_rendered, _ = render(rgb, sigma, t_sampled)
+        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, locs)
         
         #compute loss
-        loss = self.loss_fn(rgb_rendered, batch['ray_rgb'])
+        loss_coarse = self.loss_fn_coarse(rgb_rendered, batch['ray_rgb'])
+        
+        #STEP 2: forward pass through fine model
+        #sample along rays
+        locs_fine, dirs_fine, t_sampled_fine = sampler_fine(batch, t_sampled, weights.detach(), self.config['hyperparams']['num_samples_fine'])
+        
+        #get embeddings
+        locs_emb_fine, dirs_emb_fine = self.embeddings_fine(locs_fine, dirs_fine)
+        
+        #pass through model
+        sigma_fine, rgb_fine = self.model_fine(locs_emb_fine, dirs_emb_fine)
+        
+        #get rendered colors
+        rgb_rendered_fine, _, _, _ = render(rgb_fine, sigma_fine, t_sampled_fine, locs_fine)
+        
+        #compute loss
+        loss_fine = self.loss_fn_fine(rgb_rendered_fine, batch['ray_rgb'])
+        
+        #compute total loss
+        loss = loss_coarse + loss_fine
         
         #log loss
-        self.log('train/loss', loss, prog_bar=True)
+        self.log('train/l_coarse', loss_coarse, prog_bar=True, on_step=True, on_epoch=False)
+        self.log('train/l_fine', loss_fine, prog_bar=True, on_step=True, on_epoch=False)
+        self.log('train/l_total', loss, on_step=True, on_epoch=False)
         
         # log learning rate
         self.log("train/lr", self.trainer.optimizers[0].param_groups[0]['lr'], on_step=True)
         
         return loss
+    
+    # save checkpoints at the end of epochs
+    def on_train_epoch_end(self):
+        # get the path
+        save_path_coarse = os.path.join(self.config['exp']['dir'], \
+                                 'checkpoint_latest_coarse.pth')
+        save_path_fine = os.path.join(self.config['exp']['dir'], \
+                                 'checkpoint_latest_fine.pth')
+        
+        #save models
+        torch.save(self.model_coarse, save_path_coarse)
+        torch.save(self.model_fine, save_path_fine)
+
+        # log at end of epoch
+        self.log_file.info(f'Epoch {self.current_epoch} completed')
         
     def on_validation_epoch_start(self):
         #shape of image
@@ -68,34 +118,62 @@ class NeRFEngine(L.LightningModule):
         #create arrays to hold images
         self.val_reconstructed_image = torch.zeros((num_cameras, h, w, 3)).float().to(self.device)
         self.val_reconstructed_depth = torch.zeros((num_cameras, h, w)).float().to(self.device)
+        self.val_reconstructed_accumulation = torch.zeros((num_cameras, h, w)).float().to(self.device)
         
         #set variables to not require gradients
         self.val_reconstructed_image.requires_grad = False
         self.val_reconstructed_depth.requires_grad = False
+        self.val_reconstructed_accumulation.requires_grad = False
     
     def validation_step(self, batch, batch_idx):
+        #STEP 1: forward pass through coarse model
         #sample along rays
-        locs, dirs, t_sampled = sampler(batch, self.config['hyperparams']['num_samples_coarse'], fine=False)
+        locs, dirs, t_sampled = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
         
         #get embeddings
-        locs_emb, dirs_emb = self.embeddings(locs, dirs)
+        locs_emb, dirs_emb = self.embeddings_coarse(locs, dirs)
         
         #pass through model
-        sigma, rgb = self.model(locs_emb, dirs_emb)
+        sigma, rgb = self.model_coarse(locs_emb, dirs_emb)
         
         #get rendered colors
-        rgb_rendered, depth_rendered = render(rgb, sigma, t_sampled)
+        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, locs)
         
         #compute loss
-        loss = self.loss_fn(rgb_rendered, batch['ray_rgb'])
+        loss_coarse = self.loss_fn_coarse(rgb_rendered, batch['ray_rgb'])
+        
+        #STEP 2: forward pass through fine model
+        #sample along rays
+        locs_fine, dirs_fine, t_sampled_fine = sampler_fine(batch, t_sampled, weights.detach(), self.config['hyperparams']['num_samples_fine'])
+        
+        #get embeddings
+        locs_emb_fine, dirs_emb_fine = self.embeddings_fine(locs_fine, dirs_fine)
+        
+        #pass through model
+        sigma_fine, rgb_fine = self.model_fine(locs_emb_fine, dirs_emb_fine)
+        
+        #get rendered colors
+        rgb_rendered_fine, depth_rendered_fine, acc_rendered_fine, _ = render(rgb_fine, sigma_fine, t_sampled_fine, locs_fine)
+        
+        #compute loss
+        loss_fine = self.loss_fn_fine(rgb_rendered_fine, batch['ray_rgb'])
+        
+        #compute total loss
+        loss = loss_coarse + loss_fine
+        
+        #compute total loss
+        loss = loss_coarse + loss_fine
         
         #log loss
-        self.log('val/loss', loss, on_epoch=True, on_step=False)
-        
+        self.log('val/loss_coarse', loss_coarse, on_step=False, on_epoch=True)
+        self.log('val/loss_fine', loss_fine, on_step=False, on_epoch=True)
+        self.log('val/loss_total', loss, on_step=False, on_epoch=True)
+                        
         #transfer colors and depths to image
         batch_ids = batch['ray_id']
-        self.val_reconstructed_image[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = rgb_rendered
-        self.val_reconstructed_depth[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = depth_rendered
+        self.val_reconstructed_image[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = rgb_rendered_fine
+        self.val_reconstructed_depth[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = depth_rendered_fine
+        self.val_reconstructed_accumulation[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = acc_rendered_fine
         
         return loss
 
@@ -113,69 +191,66 @@ class NeRFEngine(L.LightningModule):
         depth_np = (depth_np - np.min(depth_np))/(np.max(depth_np) - np.min(depth_np))
         depth_np = np.uint8(depth_np*255)
         for depth_num in range(depth_np.shape[0]):
-            cv2.imwrite(f'test_depth_{depth_num}.png', depth_np[depth_num])
-
-    # def on_test_epoch_start(self):
-    #     #create arrays to hold images
-    #     self.test_reconstructed_image = torch.zeros(self.trainer.test_dataloaders.dataset.image.shape).float().to(self.device)
-    #     self.test_original_image = torch.zeros(self.trainer.test_dataloaders.dataset.image.shape).float().to(self.device)
-    
-    #     #convert to NCHW format
-    #     self.test_reconstructed_image = self.test_reconstructed_image.permute(2,0,1).unsqueeze(0)
-    #     self.test_original_image = self.test_original_image.permute(2,0,1).unsqueeze(0)
+            depth_np_colormaped = cv2.applyColorMap(depth_np[depth_num], cv2.COLORMAP_JET)
+            cv2.imwrite(f'test_depth_{depth_num}.png', depth_np_colormaped)
         
-    #     #set variables to not require gradients
-    #     self.test_reconstructed_image.requires_grad = False
-    #     self.test_original_image.requires_grad = False
+        #save accumulation
+        acc_np = self.val_reconstructed_accumulation.detach().cpu().numpy()
+        acc_np = (acc_np - np.min(acc_np))/(np.max(acc_np) - np.min(acc_np))
+        acc_np = np.uint8(acc_np*255)
+        for acc_num in range(acc_np.shape[0]):
+            acc_np_colormaped = cv2.applyColorMap(acc_np[acc_num], cv2.COLORMAP_JET)
+            cv2.imwrite(f'test_acc_{acc_num}.png', acc_np_colormaped)
 
     def test_step(self, batch, batch_idx):
+        #STEP 1: forward pass through coarse model
         #sample along rays
-        locs, dirs, t_sampled = sampler(batch, self.config['hyperparams']['num_samples_coarse'], fine=False)
+        locs, dirs, t_sampled = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
         
         #get embeddings
-        locs_emb, dirs_emb = self.embeddings(locs, dirs)
+        locs_emb, dirs_emb = self.embeddings_coarse(locs, dirs)
         
         #pass through model
-        sigma, rgb = self.model(locs_emb, dirs_emb)
+        sigma, rgb = self.model_coarse(locs_emb, dirs_emb)
         
         #get rendered colors
-        rgb_rendered, _ = render(rgb, sigma, t_sampled)
+        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, locs)
         
         #compute loss
-        loss = self.loss_fn(rgb_rendered, batch['ray_rgb'])
+        loss_coarse = self.loss_fn_coarse(rgb_rendered, batch['ray_rgb'])
+        
+        #STEP 2: forward pass through fine model
+        #sample along rays
+        locs_fine, dirs_fine, t_sampled_fine = sampler_fine(batch, t_sampled, weights.detach(), self.config['hyperparams']['num_samples_fine'])
+        
+        #get embeddings
+        locs_emb_fine, dirs_emb_fine = self.embeddings_fine(locs_fine, dirs_fine)
+        
+        #pass through model
+        sigma_fine, rgb_fine = self.model_fine(locs_emb_fine, dirs_emb_fine)
+        
+        #get rendered colors
+        rgb_rendered_fine, _, _, _ = render(rgb_fine, sigma_fine, t_sampled_fine, locs_fine)
+        
+        #compute loss
+        loss_fine = self.loss_fn_fine(rgb_rendered_fine, batch['ray_rgb'])
+        
+        #compute total loss
+        loss = loss_coarse + loss_fine
         
         #log loss
-        self.log('test/loss', loss, on_epoch=True, on_step=False)
+        self.log('test/loss_coarse', loss_coarse, on_step=False, on_epoch=True)
+        self.log('test/loss_fine', loss_fine, on_step=False, on_epoch=True)
+        self.log('test/loss_total', loss, on_step=False, on_epoch=True)
         
         return loss
-        
-    # def on_test_epoch_end(self):
-    #     #compute metrics
-    #     metrics = self.test_metrics(self.test_reconstructed_image, self.test_original_image)
-        
-    #     #log metrics
-    #     self.log_dict(metrics)
-        
-    #     #log image
-    #     image_pil = self.test_reconstructed_image.squeeze(0).permute(1,2,0)
-    #     image_pil = image_pil.cpu().numpy()*255
-    #     image_pil = image_pil.astype('uint8')
-    #     image_pil = Image.fromarray(image_pil[:,:,::-1])
-    #     self.logger.experiment.log_image(image_pil, name='test_reconstructed_image')
-        
-    #     #save image
-    #     image_pil.save(os.path.join(self.logger.save_dir, 'test_reconstructed.png'))
     
     def configure_optimizers(self):
         if self.config['optimizer']['name'] == "adam":
-            optimizer = optim.Adam(self.model.parameters(), \
+            optimizer = optim.Adam(list(self.model_coarse.parameters()) + list(self.model_fine.parameters()), \
                                 lr=self.config['hyperparams']['lr'],
                                 betas=(0.9, 0.999))
-        # lr_scheduler = {
-        #         'scheduler': StepLR(optimizer, step_size=1, gamma=0.99),
-        #         'interval': 'epoch',
-        #         'frequency': 1
-        #         }
+            
         lr_scheduler = StepLR(optimizer, step_size=1, gamma=0.95)
         
         return [optimizer], [lr_scheduler]
@@ -186,18 +261,34 @@ def main(config):
     
         Args:
             config: configuration for training
-    """
+    """    
     #initialize dataloaders
     train_dataloader = get_dataloader('train', config)
     val_dataloader = get_dataloader('val', config)
     test_dataloader = get_dataloader('test', config)
     
+    # create root folder
+    exp_id = get_time_string()
+    exp_dir = os.path.join(config['exp']['root'], exp_id + '_' + config['exp']['name'])
+    config['exp']['id'] = exp_id
+    config['exp']['dir'] = exp_dir
+    wandb_path = os.path.join(exp_dir, 'wandb')
+    os.makedirs(wandb_path, exist_ok=True)
+    
     #define logger
-    save_dir = os.path.join(config['exp']['root'], config['exp']['name'])
-    os.makedirs(save_dir, exist_ok=True)
-    comet_logger = CometLogger(project_name="nerf-colmap",
-                               save_dir=save_dir,
-                               experiment_name=config['exp']['name'])
+    wandb_logger = WandbLogger(name=config['exp']['name'],
+                                save_dir=wandb_path,
+                                project="nerf_simple",
+                                offline=config['exp']['offline_logging'])
+    
+    # log hyperparameters
+    wandb_logger.log_hyperparams(config)
+    
+    # log training script
+    wandb_run = wandb_logger.experiment
+    artifact = wandb.Artifact('train_script', type='code')
+    artifact.add_file('train.py')
+    wandb_run.log_artifact(artifact)
     
     #initialize lightning module
     nerf_engine = NeRFEngine(config)
@@ -207,7 +298,7 @@ def main(config):
                          accelerator='cuda', 
                          devices=[0], 
                          precision='16',
-                         logger=comet_logger
+                         logger=wandb_logger
                         )
     
     #start training
@@ -219,6 +310,9 @@ def main(config):
     
 
 if __name__ == "__main__":
+    #set seed
+    L.seed_everything(27011996)
+    
     #parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True, help='path to configuation file')

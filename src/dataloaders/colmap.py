@@ -30,7 +30,8 @@ class COLMAP(Dataset):
         self.num_cameras, self.h, self.w  = self.rays['ray_o'].shape[:3]
         
         #size of dataset
-        self.size = min(config['data'][split]['size'], self.num_cameras*self.h*self.w) if config['data'][split]['size'] is not None else self.num_cameras*self.h*self.w 
+        self.is_partial_data = config['data'][split]['size'] is not None
+        self.size = min(config['data'][split]['size'], self.num_cameras*self.h*self.w) if self.is_partial_data else self.num_cameras*self.h*self.w 
         
     def __len__(self):
         """Length of dataset
@@ -40,11 +41,15 @@ class COLMAP(Dataset):
     def __getitem__(self, idx):
         """Get item from dataset
         """
+        #if dataset is partial, override idx
+        if self.is_partial_data:
+            idx = np.random.randint(0, self.num_cameras*self.h*self.w)
+        
         #select camera id, y and x
         cam_id = idx//(self.h*self.w)
         y = (idx - cam_id*self.h*self.w)//self.w
         x = (idx - cam_id*self.h*self.w)%self.w
-                
+                  
         #gather data
         batch = {}
         batch['ray_id'] = torch.tensor([cam_id, y, x])
