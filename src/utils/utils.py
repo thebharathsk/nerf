@@ -124,7 +124,7 @@ def compute_alpha(sigma, dists):
 def compute_transmittance(alpha):
     return torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)).to(alpha.device), 1.-alpha + 1e-10], -1), -1)[:, :-1]
 
-def render(rgb, sigma, t_sampled, locs):
+def render(rgb, sigma, t_sampled, dirs):
     #set device
     device = rgb.device
     
@@ -141,7 +141,7 @@ def render(rgb, sigma, t_sampled, locs):
     rgb_rendered = torch.sum(weights[...,None] * rgb, -2)  #Rx3
 
     # depth_rendered = torch.sum((weights * locs[...,-1]), -1)+1 #R
-    depth_rendered = torch.sum((weights * t_sampled[...,0]), -1) #R
+    depth_rendered = torch.sum(weights * (t_sampled[...,0]*(dirs[:,-1].unsqueeze(1))), -1) #R
     # disp_map = 1./torch.max(1e-10 * torch.ones_like(depth_map), depth_map / torch.sum(weights, -1))
     accumulation_rendered = torch.sum(weights, -1) #R
 
