@@ -135,6 +135,10 @@ def transform_3d(extrinsics, points3d):
     #find bounds of points
     lower_bounds, upper_bounds = get_bounds(points3d)
     
+    #relax bounds by 10%
+    lower_bounds = lower_bounds - 0.1*(upper_bounds - lower_bounds)
+    upper_bounds = upper_bounds + 0.1*(upper_bounds - lower_bounds)
+    
     #find center of volume
     center = (lower_bounds + upper_bounds) / 2
     
