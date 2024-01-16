@@ -3,6 +3,9 @@ import torch
 import logging
 import csv
 
+import matplotlib.pyplot as plt
+import torch.nn.functional as F
+
 from datetime import datetime
 
 #function to generate timestamp string
@@ -124,17 +127,44 @@ def compute_alpha(sigma, dists):
 def compute_transmittance(alpha):
     return torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)).to(alpha.device), 1.-alpha + 1e-10], -1), -1)[:, :-1]
 
-def render(rgb, sigma, t_sampled, dirs):
+def render(rgb, sigma, t_sampled, dirs, add_sigma_noise=False, plot=False):
     #set device
     device = rgb.device
     
+    #compute distances between samples
     dists = t_sampled[...,1:,0] - t_sampled[...,:-1,0] #Rx(T-1)
     dists = torch.cat([dists, torch.Tensor([1e10]).expand(dists[...,0:1].shape).to(device)], -1)  #RxT
 
     # dists = dists * torch.norm(rays_d[...,None,:], dim=-1)
-
+    
+    #adjust sigma
+    if add_sigma_noise:
+        sigma_noise = torch.randn(sigma.shape, device=device)
+        sigma = sigma + sigma_noise
+    sigma = F.relu(sigma)
+    
     alpha = compute_alpha(sigma[...,0], dists)  #RxT
     transmittance = compute_transmittance(alpha)
+    
+    if plot:
+        exp_dir = '/home/bharathsk/projects/nerf/exps/20240116_002224_drop_2_noisy_sigma/'
+
+        sigma_np = sigma.detach().cpu().numpy()
+        alpha_np = alpha.detach().cpu().numpy()
+        transmittance_np = transmittance.detach().cpu().numpy()
+        t_sampled_np = t_sampled.detach().cpu().numpy()
+        
+        plt.plot(t_sampled_np[0,:,0], sigma_np[0], 'b^')
+        plt.savefig(os.path.join(exp_dir, f'sigma.png'))
+        plt.close()
+        
+        plt.plot(t_sampled_np[0,:,0], alpha_np[0], 'b^')
+        plt.savefig(os.path.join(exp_dir, f'alpha.png'))
+        plt.close()
+        
+        plt.plot(t_sampled_np[0,:,0], transmittance_np[0], 'b^')
+        plt.savefig(os.path.join(exp_dir, f'transmittance.png'))
+        plt.close()
     
     # weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
     weights = alpha * transmittance #RxT

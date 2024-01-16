@@ -49,7 +49,7 @@ class COLMAP(Dataset):
         cam_id = idx//(self.h*self.w)
         y = (idx - cam_id*self.h*self.w)//self.w
         x = (idx - cam_id*self.h*self.w)%self.w
-                  
+        
         #gather data
         batch = {}
         batch['ray_id'] = torch.tensor([cam_id, y, x])

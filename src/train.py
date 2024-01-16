@@ -60,7 +60,7 @@ class NeRFEngine(L.LightningModule):
         sigma, rgb = self.model_coarse(locs_emb, dirs_emb)
         
         #get rendered colors
-        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, batch['ray_d'])
+        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, batch['ray_d'], add_sigma_noise=True)
         
         #compute loss
         loss_coarse = self.loss_fn_coarse(rgb_rendered, batch['ray_rgb'])
@@ -76,7 +76,7 @@ class NeRFEngine(L.LightningModule):
         sigma_fine, rgb_fine = self.model_fine(locs_emb_fine, dirs_emb_fine)
         
         #get rendered colors
-        rgb_rendered_fine, _, _, _ = render(rgb_fine, sigma_fine, t_sampled_fine, batch['ray_d'])
+        rgb_rendered_fine, _, _, _ = render(rgb_fine, sigma_fine, t_sampled_fine, batch['ray_d'], add_sigma_noise=True)
         
         #compute loss
         loss_fine = self.loss_fn_fine(rgb_rendered_fine, batch['ray_rgb'])
@@ -184,7 +184,7 @@ class NeRFEngine(L.LightningModule):
         img_np = img_np[...,::-1]
         img_np = np.uint8(img_np*255)
         for img_num in range(img_np.shape[0]):
-            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_{img_num}.png'), img_np[img_num])
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'train_{img_num}.png'), img_np[img_num])
         
         #save depth
         depth_np = self.val_reconstructed_depth.detach().cpu().numpy()
@@ -192,7 +192,7 @@ class NeRFEngine(L.LightningModule):
         depth_np = np.uint8(depth_np*255)
         for depth_num in range(depth_np.shape[0]):
             depth_np_colormaped = cv2.applyColorMap(depth_np[depth_num], cv2.COLORMAP_JET)
-            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_depth_{depth_num}.png'), depth_np_colormaped[depth_num])
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'train_depth_{depth_num}.png'), depth_np_colormaped)
         
         #save accumulation
         acc_np = self.val_reconstructed_accumulation.detach().cpu().numpy()
@@ -200,7 +200,7 @@ class NeRFEngine(L.LightningModule):
         acc_np = np.uint8(acc_np*255)
         for acc_num in range(acc_np.shape[0]):
             acc_np_colormaped = cv2.applyColorMap(acc_np[acc_num], cv2.COLORMAP_JET)
-            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_acc_{acc_num}.png'), acc_np_colormaped[acc_num])
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'train_acc_{acc_num}.png'), acc_np_colormaped)
 
     def test_step(self, batch, batch_idx):
         #STEP 1: forward pass through coarse model

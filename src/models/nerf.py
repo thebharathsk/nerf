@@ -23,7 +23,7 @@ class NeRF(nn.Module):
                 self.final_layers.append(LinearReLU(config['model']['hidden_dim'], config['model']['hidden_dim']))
             
         #volume density output layers
-        self.sigma_output = LinearReLU(config['model']['hidden_dim'], 1)
+        self.sigma_output = nn.Linear(config['model']['hidden_dim'], 1)
         
         #radiance output layers
         self.features = nn.Linear(config['model']['hidden_dim'], config['model']['hidden_dim'])
