@@ -75,7 +75,7 @@ def sampler_fine(rays, t_coarse, weights, num_samples):
     #create bin centers
     bins = (t_coarse[...,1:,0] + t_coarse[...,:-1,0])/2 #Rx(T-1)
     
-    #ignore last weight
+    #ignore first and last weight
     weights = weights[...,1:-1] #Rx(T-2)
     
     #compute cdf from weights
@@ -119,7 +119,7 @@ def sampler_fine(rays, t_coarse, weights, num_samples):
     return locs, dirs, t_combined
     
 def compute_alpha(sigma, dists):
-    return 1.-torch.exp(-sigma*dists)
+    return 1-torch.exp(-sigma*dists)
 
 def compute_transmittance(alpha):
     return torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)).to(alpha.device), 1.-alpha + 1e-10], -1), -1)[:, :-1]

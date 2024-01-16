@@ -103,8 +103,8 @@ class NeRFEngine(L.LightningModule):
                                  'checkpoint_latest_fine.pth')
         
         #save models
-        torch.save(self.model_coarse, save_path_coarse)
-        torch.save(self.model_fine, save_path_fine)
+        torch.save(self.model_coarse.state_dict(), save_path_coarse)
+        torch.save(self.model_fine.state_dict(), save_path_fine)
 
         # log at end of epoch
         self.log_file.info(f'Epoch {self.current_epoch} completed')
@@ -184,7 +184,7 @@ class NeRFEngine(L.LightningModule):
         img_np = img_np[...,::-1]
         img_np = np.uint8(img_np*255)
         for img_num in range(img_np.shape[0]):
-            cv2.imwrite(f'test_{img_num}.png', img_np[img_num])
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_{img_num}.png'), img_np[img_num])
         
         #save depth
         depth_np = self.val_reconstructed_depth.detach().cpu().numpy()
@@ -192,7 +192,7 @@ class NeRFEngine(L.LightningModule):
         depth_np = np.uint8(depth_np*255)
         for depth_num in range(depth_np.shape[0]):
             depth_np_colormaped = cv2.applyColorMap(depth_np[depth_num], cv2.COLORMAP_JET)
-            cv2.imwrite(f'test_depth_{depth_num}.png', depth_np_colormaped)
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_depth_{depth_num}.png'), depth_np_colormaped[depth_num])
         
         #save accumulation
         acc_np = self.val_reconstructed_accumulation.detach().cpu().numpy()
@@ -200,7 +200,7 @@ class NeRFEngine(L.LightningModule):
         acc_np = np.uint8(acc_np*255)
         for acc_num in range(acc_np.shape[0]):
             acc_np_colormaped = cv2.applyColorMap(acc_np[acc_num], cv2.COLORMAP_JET)
-            cv2.imwrite(f'test_acc_{acc_num}.png', acc_np_colormaped)
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_acc_{acc_num}.png'), acc_np_colormaped[acc_num])
 
     def test_step(self, batch, batch_idx):
         #STEP 1: forward pass through coarse model

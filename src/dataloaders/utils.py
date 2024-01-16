@@ -37,9 +37,9 @@ def get_intrinsics(workspace_path):
     #create intrinsics matrix
     intrinsics = np.zeros((3, 3))
     intrinsics[0, 0] = camera_params[0]
-    intrinsics[1, 1] = camera_params[0]
-    intrinsics[0, 2] = camera_params[1]
-    intrinsics[1, 2] = camera_params[2]
+    intrinsics[1, 1] = camera_params[1]
+    intrinsics[0, 2] = camera_params[2]
+    intrinsics[1, 2] = camera_params[3]
     
     return intrinsics, (h,w)
 
@@ -181,7 +181,6 @@ def get_ray_data(image_path, workspace_path, downscale):
     #find transform to fit point cloud volume into cube of size 2
     extrinsics_transformed, points3d_transformed, transform = transform_3d(extrinsics, points3d)
     extrinsics_transformed_inv = np.linalg.inv(extrinsics_transformed)
-    # print(-(np.linalg.inv(extrinsics_transformed[:,0:3,0:3])@extrinsics_transformed[:,0:3,3:])[:,-1,0])
 
     #number of cameras
     num_cameras = extrinsics.shape[0]
