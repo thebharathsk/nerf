@@ -35,7 +35,7 @@ def get_intrinsics(workspace_path):
     w = cameras[1].width
     
     #create intrinsics matrix
-    intrinsics = np.zeros((3, 3))
+    intrinsics = np.eye(3)
     intrinsics[0, 0] = camera_params[0]
     intrinsics[1, 1] = camera_params[1]
     intrinsics[0, 2] = camera_params[2]
@@ -47,7 +47,7 @@ def get_extrinsics(workspace_path):
     #extract data
     cameras = read_images_binary(os.path.join(workspace_path, 'images.bin'))
     
-    #extract intrinsics as dictionary
+    #extract extrinsics as dictionary
     extrinsics_dict = {}
     for c in cameras.values():
         extrinsic_matrix = np.eye(4)
@@ -66,15 +66,42 @@ def get_extrinsics(workspace_path):
     return extrinsics
 
 def get_points(workspace_path):
-    #extract data
+    #extract image data and map image names to image ids
+    cameras = read_images_binary(os.path.join(workspace_path, 'images.bin'))
+    
+    #extract extrinsics as dictionary
+    image_names = []
+    image_ids = []
+    for c in cameras.values():
+        image_names.append(c.name)
+        image_ids.append(c.id)
+    
+    #sort image names
+    image_names_argsort = np.argsort(image_names)
+    
+    #create image id map
+    image_id_map = {image_ids[v]:i for i, v in enumerate(image_names_argsort)}
+    
+    #extract point data
     points3D = read_points3D_binary(os.path.join(workspace_path, 'points3D.bin'))
     
-    #extract xyz
+    #extract xyz and visibility flags
     points3D_arr = np.zeros((len(points3D), 3))
-    for i, point in enumerate(points3D.values()):
-        points3D_arr[i] = point.xyz
+    visibility = np.zeros((len(points3D), len(cameras)))
+    error = np.zeros((len(points3D)))
     
-    return points3D_arr
+    for i, point in enumerate(points3D.values()):
+        #store point coordinates
+        points3D_arr[i] = point.xyz
+        
+        #store error
+        error[i] = point.error
+        
+        #extract visibility
+        for j in point.image_ids:
+            visibility[i, image_id_map[j]] = 1
+    
+    return points3D_arr, visibility, error
 
 def get_image_paths(image_path, workspace_path):
     #extract data
@@ -135,9 +162,9 @@ def transform_3d(extrinsics, points3d):
     #find bounds of points
     lower_bounds, upper_bounds = get_bounds(points3d)
     
-    #relax bounds by 10%
-    lower_bounds = lower_bounds - 0.1*(upper_bounds - lower_bounds)
-    upper_bounds = upper_bounds + 0.1*(upper_bounds - lower_bounds)
+    #relax bounds by 20%
+    lower_bounds = lower_bounds - 0.15*(upper_bounds - lower_bounds)
+    upper_bounds = upper_bounds + 0.15*(upper_bounds - lower_bounds)
     
     #find center of volume
     center = (lower_bounds + upper_bounds) / 2
@@ -167,7 +194,7 @@ def get_ray_data(image_path, workspace_path, downscale):
     #get intrinsics, extrinsics, points3d and image paths
     K, (h,w) = get_intrinsics(workspace_path)
     extrinsics = get_extrinsics(workspace_path)
-    points3d = get_points(workspace_path)
+    points3d, visibility, error = get_points(workspace_path)
     image_paths = get_image_paths(image_path, workspace_path)
     
     #adjust scale of intrinsics
@@ -180,7 +207,15 @@ def get_ray_data(image_path, workspace_path, downscale):
     
     #find transform to fit point cloud volume into cube of size 2
     extrinsics_transformed, points3d_transformed, transform = transform_3d(extrinsics, points3d)
+    
+    #compute camera to world transformation
     extrinsics_transformed_inv = np.linalg.inv(extrinsics_transformed)
+
+    #filter points outside the cube
+    pts_mask = np.all(points3d_transformed >= -1, axis=1) & np.all(points3d_transformed <= 1, axis=1)
+    points3d_transformed = points3d_transformed[pts_mask]
+    visibility = visibility[pts_mask]
+    error = error[pts_mask]
 
     #number of cameras
     num_cameras = extrinsics.shape[0]
@@ -213,17 +248,55 @@ def get_ray_data(image_path, workspace_path, downscale):
     t_range = np.concatenate([t_min, t_max], axis=-1)
     
     #get rgb data
-    rgb = np.zeros((num_cameras, h, w, 3))
     print('Loading images...')
-    for i, image_path in tqdm(enumerate(image_paths)):
+    rgb = np.zeros((num_cameras, h, w, 3))
+    for i, image_path in tqdm(enumerate(image_paths), total=num_cameras):
         img = cv2.imread(image_path)[:,:,::-1]
         img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
         rgb[i] = np.array(img, 'float')/255.0
+    
+    #get depth data
+    print('Creating depth data...')
+    z_coord = -np.ones((num_cameras, h, w, 1))
+    t_depth = -np.ones((num_cameras, h, w, 1))
+    reproj_error = -np.ones((num_cameras, h, w, 1))
+    for i in tqdm(range(num_cameras)):
+        #get visibility mask for camera
+        visibility_mask = visibility[:, i] == 1
+        
+        #get visible points
+        visible_points = points3d_transformed[visibility_mask] # (num_visible_points, 3)
+                
+        #convert to homogeneous coordinates
+        visible_points = np.concatenate([visible_points, np.ones((visible_points.shape[0], 1))], axis=-1) # (num_visible_points, 4)
+        
+        #project visible points onto image plane
+        visible_points_proj = K@extrinsics_transformed[i,0:3]@visible_points.T # (3, num_visible_points)
+        visible_points_proj = visible_points_proj/visible_points_proj[2]
+        visible_points_proj = visible_points_proj[0:2].T # (num_visible_points, 2)
+                
+        #round off projected points
+        visible_points_proj = np.round(visible_points_proj).astype(np.int32)
+        
+        #apply limits to projected points
+        visible_points_proj[:,0] = np.clip(visible_points_proj[:,0], 0, w-1)
+        visible_points_proj[:,1] = np.clip(visible_points_proj[:,1], 0, h-1)
+        
+        #store depth at 2d points
+        z_coord[i, visible_points_proj[:,1], visible_points_proj[:,0]] = visible_points[:,2:3]
+        
+        #compute t value
+        t_depth[i, visible_points_proj[:,1], visible_points_proj[:,0]] = (z_coord[i, visible_points_proj[:,1], visible_points_proj[:,0]] - rays_o[i, visible_points_proj[:,1], visible_points_proj[:,0], 2:])/rays_d[i, visible_points_proj[:,1], visible_points_proj[:,0], 2:]
+        
+        #store reprpojection error at 2d points
+        reproj_error[i, visible_points_proj[:,1], visible_points_proj[:,0],0] = error[visibility_mask]     
         
     #convert into torch tensors
     rays_o = torch.from_numpy(rays_o).contiguous().float()
     rays_d = torch.from_numpy(rays_d).contiguous().float()
     rgb = torch.from_numpy(rgb).contiguous().float()
     t_range = torch.from_numpy(t_range).contiguous().float()
+    t_depth = torch.from_numpy(t_depth).contiguous().float()
+    reproj_error = torch.from_numpy(reproj_error).contiguous().float()
     
-    return rays_o, rays_d, rgb, t_range
+    return rays_o, rays_d, rgb, t_range, t_depth, reproj_error

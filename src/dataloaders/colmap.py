@@ -18,7 +18,7 @@ class COLMAP(Dataset):
                 
         #create an array of rays
         self.rays = {}
-        self.rays['ray_o'], self.rays['ray_d'], self.rays['ray_rgb'], self.rays['ray_bds'] = get_ray_data(self.image_path, self.workspace_path, self.downscale)
+        self.rays['ray_o'], self.rays['ray_d'], self.rays['ray_rgb'], self.rays['ray_bds'], self.rays['ray_term'], self.rays['reproj_error'] = get_ray_data(self.image_path, self.workspace_path, self.downscale)
         
         #select images
         self.imgs_list = config['data'][split]['imgs_list']

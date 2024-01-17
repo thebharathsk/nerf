@@ -2,7 +2,7 @@ import os
 import argparse
 import yaml
 import torch
-import wandb
+import matplotlib.pyplot as plt
 import cv2 as cv2
 import numpy as np
 
@@ -40,10 +40,10 @@ class NeRFEngine(L.LightningModule):
         self.model_fine = get_model(config)
         
         #load pretrained weights
-        self.model_coarse = torch.load(os.path.join(config['exp']['dir'], 'checkpoint_latest_coarse.pth'))
-        self.model_fine = torch.load(os.path.join(config['exp']['dir'], 'checkpoint_latest_fine.pth'))
-        # self.model_coarse.load_state_dict(weights_coarse)
-        # self.model_coarse.load_state_dict(weights_fine)
+        weights_coarse = torch.load(os.path.join(config['exp']['dir'], 'checkpoint_latest_coarse.pth'))
+        weights_fine = torch.load(os.path.join(config['exp']['dir'], 'checkpoint_latest_fine.pth'))
+        self.model_coarse.load_state_dict(weights_coarse, strict=True)
+        self.model_fine.load_state_dict(weights_fine, strict=True)
         
         #initialize loss function
         self.loss_fn_coarse = get_loss(config)
@@ -82,7 +82,14 @@ class NeRFEngine(L.LightningModule):
         sigma, rgb = self.model_coarse(locs_emb, dirs_emb)
         
         #get rendered colors
-        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, batch['ray_d'])
+        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, batch['ray_d'], locs, plot=False)
+        
+        #plot weights fine
+        weights_np = weights.detach().cpu().numpy()
+        t_sampled_np = t_sampled.detach().cpu().numpy()        
+        plt.plot(t_sampled_np[0,:,0], weights_np[0], 'b^')
+        plt.savefig(os.path.join(self.config['exp']['dir'], f'weights_coarse.png'))
+        plt.close()
         
         #compute loss
         loss_coarse = self.loss_fn_coarse(rgb_rendered, batch['ray_rgb'])
@@ -98,8 +105,15 @@ class NeRFEngine(L.LightningModule):
         sigma_fine, rgb_fine = self.model_fine(locs_emb_fine, dirs_emb_fine)
         
         #get rendered colors
-        rgb_rendered_fine, depth_rendered_fine, acc_rendered_fine, _ = render(rgb_fine, sigma_fine, t_sampled_fine, batch['ray_d'])
+        rgb_rendered_fine, depth_rendered_fine, acc_rendered_fine, weights_fine = render(rgb_fine, sigma_fine, t_sampled_fine, batch['ray_d'], locs_fine, plot=False)
         
+        #plot weights fine
+        weights_fine_np = weights_fine.detach().cpu().numpy()
+        t_sampled_fine_np = t_sampled_fine.detach().cpu().numpy()        
+        plt.plot(t_sampled_fine_np[0,:,0], weights_fine_np[0], 'r^')
+        plt.savefig(os.path.join(self.config['exp']['dir'], f'weights_fine.png'))
+        plt.close()
+
         #compute loss
         loss_fine = self.loss_fn_fine(rgb_rendered_fine, batch['ray_rgb'])
         
@@ -126,15 +140,7 @@ class NeRFEngine(L.LightningModule):
         img_np = img_np[...,::-1]
         img_np = np.uint8(img_np*255)
         for img_num in range(img_np.shape[0]):
-            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_{img_num}.png'), img_np[img_num])
-        
-        #save depth
-        depth_np = self.test_reconstructed_depth.detach().cpu().numpy()
-        depth_np = (depth_np - np.min(depth_np))/(np.max(depth_np) - np.min(depth_np))
-        depth_np = np.uint8(depth_np*255)
-        for depth_num in range(depth_np.shape[0]):
-            depth_np_colormaped = cv2.applyColorMap(depth_np[depth_num], cv2.COLORMAP_JET)
-            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_depth_{depth_num}.png'), depth_np_colormaped[depth_num])
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'eval_{img_num}.png'), img_np[img_num])
         
         #save accumulation
         acc_np = self.test_reconstructed_accumulation.detach().cpu().numpy()
@@ -142,7 +148,17 @@ class NeRFEngine(L.LightningModule):
         acc_np = np.uint8(acc_np*255)
         for acc_num in range(acc_np.shape[0]):
             acc_np_colormaped = cv2.applyColorMap(acc_np[acc_num], cv2.COLORMAP_JET)
-            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'test_acc_{acc_num}.png'), acc_np_colormaped[acc_num])
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'eval_acc_{acc_num}.png'), acc_np_colormaped)
+            
+        #save depth
+        depth_np = self.test_reconstructed_depth.detach().cpu().numpy()
+        depth_np[acc_np < 220] = np.mean(depth_np)
+        depth_np = (depth_np - np.min(depth_np))/(np.max(depth_np) - np.min(depth_np))
+        depth_np = np.uint8(depth_np*255)
+        for depth_num in range(depth_np.shape[0]):
+            depth_np_colormaped = cv2.applyColorMap(depth_np[depth_num], cv2.COLORMAP_JET)
+            cv2.imwrite(os.path.join(self.config['exp']['dir'], f'eval_depth_{depth_num}.png'), depth_np_colormaped)
+        
              
 #main function
 def main(config):
@@ -169,7 +185,8 @@ def main(config):
     trainer = L.Trainer(max_epochs=0,
                         accelerator='cuda', 
                         devices=[0], 
-                        precision='16'
+                        precision='16',
+                        logger=False
                         )
     
     #test at the end
