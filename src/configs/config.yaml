@@ -1,7 +1,7 @@
 #experiment name
 exp:
   root: /home/bharathsk/projects/nerf/exps/
-  name: drop_2_render_z_1epoch
+  name: dict_all
   offline_logging: False
 
 #hyperparameters
@@ -12,8 +12,8 @@ hyperparams:
   num_samples_coarse: 64
   num_samples_fine: 128
   iterations: 10000000
-  epochs: 50
-  num_workers: 16
+  epochs: 6
+  num_workers: 24
 
 #dataset
 data:
@@ -58,7 +58,8 @@ model:
 
 #loss functions:
 loss:
-  name: 'mse'
+  names: ['mse']
+  weights: [1.0]
 
 #optimizer
 optimizer:
