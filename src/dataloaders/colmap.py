@@ -57,5 +57,7 @@ class COLMAP(Dataset):
         batch['ray_d'] = self.rays['ray_d'][cam_id, y, x]
         batch['ray_rgb'] = self.rays['ray_rgb'][cam_id, y, x]
         batch['ray_bds'] = self.rays['ray_bds'][cam_id, y, x]
+        batch['ray_term'] = self.rays['ray_term'][cam_id, y, x]
+        batch['reproj_error'] = self.rays['reproj_error'][cam_id, y, x]
         
         return batch

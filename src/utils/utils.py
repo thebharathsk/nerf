@@ -68,12 +68,22 @@ def sampler_coarse(rays, num_samples):
     
     #convert directions to same shape as pts
     dirs = rays_d.expand(locs.shape)
+    
+    #create a dictionary of outputs
+    samples = {}
+    samples['locs'] = locs
+    samples['dirs'] = dirs
+    samples['t_sampled'] = t_sampled_rand
         
-    return locs, dirs, t_sampled_rand
+    return samples
 
-def sampler_fine(rays, t_coarse, weights, num_samples):
+def sampler_fine(batch, samples_coarse, renders_coarse, num_samples):
     #set device
-    device = rays['ray_o'].device
+    device = batch['ray_o'].device
+    
+    #extract useful variables
+    t_coarse = samples_coarse['t_sampled'] #RxTx1
+    weights = renders_coarse['weights'].detach() #RxTx1
     
     #create bin centers
     bins = (t_coarse[...,1:,0] + t_coarse[...,:-1,0])/2 #Rx(T-1)
@@ -112,14 +122,20 @@ def sampler_fine(rays, t_coarse, weights, num_samples):
     t_combined, _ = torch.sort(torch.cat([t_fine, t_coarse], 1), 1) #Rx(T+N)x1
     
     #convert samples to locations and directions
-    rays_o = rays['ray_o'].unsqueeze(1) #Rx1x3
-    rays_d = rays['ray_d'].unsqueeze(1) #Rx1x3
+    rays_o = batch['ray_o'].unsqueeze(1) #Rx1x3
+    rays_d = batch['ray_d'].unsqueeze(1) #Rx1x3
     locs = rays_o + t_combined * rays_d #Rx(T+N)x3
     
     #convert directions to same shape as pts
     dirs = rays_d.expand(locs.shape) #Rx(T+N)x3
     
-    return locs, dirs, t_combined
+    #create a dictionary of outputs
+    samples = {}
+    samples['locs'] = locs
+    samples['dirs'] = dirs
+    samples['t_sampled'] = t_combined
+    
+    return samples
     
 def compute_alpha(sigma, dists):
     return 1-torch.exp(-sigma*dists)
@@ -127,9 +143,15 @@ def compute_alpha(sigma, dists):
 def compute_transmittance(alpha):
     return torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)).to(alpha.device), 1.-alpha + 1e-10], -1), -1)[:, :-1]
 
-def render(rgb, sigma, t_sampled, dirs, add_sigma_noise=False, plot=False):
+def render(samples, outputs, add_sigma_noise=False, plot=False):
     #set device
-    device = rgb.device
+    device = outputs['rgb'].device
+    
+    #extract useful variables
+    dirs = samples['dirs'] #RxTx3
+    t_sampled = samples['t_sampled'] #RxTx1
+    rgb = outputs['rgb'] #RxTx3
+    sigma = outputs['sigma'] #RxTx1
     
     #compute distances between samples
     dists = t_sampled[...,1:,0] - t_sampled[...,:-1,0] #Rx(T-1)
@@ -171,11 +193,14 @@ def render(rgb, sigma, t_sampled, dirs, add_sigma_noise=False, plot=False):
     rgb_rendered = torch.sum(weights[...,None] * rgb, -2)  #Rx3
 
     # depth_rendered = torch.sum((weights * locs[...,-1]), -1)+1 #R
-    depth_rendered = torch.sum(weights * (t_sampled[...,0]*(dirs[:,-1].unsqueeze(1))), -1) #R
-    # disp_map = 1./torch.max(1e-10 * torch.ones_like(depth_map), depth_map / torch.sum(weights, -1))
+    depth_rendered = torch.sum(weights * (t_sampled[...,0]*dirs[...,-1]), -1) #R
     accumulation_rendered = torch.sum(weights, -1) #R
 
-    # if white_bkgd:
-    #     rgb_map = rgb_map + (1.-acc_map[...,None])
+    #create a dictionary of outputs
+    rendered = {}
+    rendered['rgb'] = rgb_rendered
+    rendered['depth'] = depth_rendered
+    rendered['acc'] = accumulation_rendered
+    rendered['weights'] = weights
 
-    return rgb_rendered, depth_rendered, accumulation_rendered, weights
+    return rendered

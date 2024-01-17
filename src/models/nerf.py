@@ -33,7 +33,8 @@ class NeRF(nn.Module):
             nn.Linear(config['model']['hidden_dim']//2, 3),
             nn.Sigmoid()
         )
-    def forward(self, x_locs, x_dirs):
+    def forward(self, embeddings):
+        x_locs, x_dirs = embeddings['locs'], embeddings['dirs']
         #intermediate layers
         for i, layer in enumerate(self.intermediate_layers):
             if i == 0:
@@ -60,5 +61,10 @@ class NeRF(nn.Module):
         #estimate rgb
         rgb = self.rgb_output(fts)
         
-        return sigma, rgb
+        #create a dictionary of outputs
+        outputs = {}
+        outputs['sigma'] = sigma
+        outputs['rgb'] = rgb
+        
+        return outputs
         

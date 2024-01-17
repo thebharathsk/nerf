@@ -13,23 +13,23 @@ class SinusoidalEmbeddings(nn.Module):
         self.num_freq_loc = config['embeddings']['num_freq_loc']
         self.num_freq_dir = config['embeddings']['num_freq_dir']
         
-    def forward(self, locs, dirs):
-        """Forward pass for Sinusoidal Embeddings
-            locs: coordinates to embed
-        """        
-        #get frequencies
-        freqs_loc = torch.Tensor([2**i for i in range(self.num_freq_loc)]).unsqueeze(0).unsqueeze(0).unsqueeze(0).to(locs.device) #1x1x1xF_loc
-        freqs_dir = torch.Tensor([2**i for i in range(self.num_freq_dir)]).unsqueeze(0).unsqueeze(0).unsqueeze(0).to(locs.device) #1x1x1xF_dir
+    def forward(self, samples):
+        #get locations and directions
+        locs = samples['locs'].unsqueeze(3) #RxTx3x1
+        dirs = samples['dirs'].unsqueeze(3) #RxTx3x1
         
-        #increase dimensionality of coords
-        locs = locs.unsqueeze(3) #RxTx3x1
-        dirs = dirs.unsqueeze(3) #RxTx2x1
+        #store device
+        device = locs.device
+        
+        #get frequencies
+        freqs_loc = torch.Tensor([2**i for i in range(self.num_freq_loc)]).unsqueeze(0).unsqueeze(0).unsqueeze(0).to(device) #1x1x1xF_loc
+        freqs_dir = torch.Tensor([2**i for i in range(self.num_freq_dir)]).unsqueeze(0).unsqueeze(0).unsqueeze(0).to(device) #1x1x1xF_dir
         
         #get embeddings
         locs_embeddings_sin = torch.sin(freqs_loc*math.pi*locs) #RxTx3xF_loc
         locs_embeddings_cos = torch.cos(freqs_loc*math.pi*locs) #RxTx3xF_loc
-        dirs_embeddings_sin = torch.sin(freqs_dir*math.pi*locs) #RxTx3xF_dir
-        dirs_embeddings_cos = torch.cos(freqs_dir*math.pi*locs) #RxTx3xF_dir
+        dirs_embeddings_sin = torch.sin(freqs_dir*math.pi*dirs) #RxTx3xF_dir
+        dirs_embeddings_cos = torch.cos(freqs_dir*math.pi*dirs) #RxTx3xF_dir
         
         #aggregate embeddings
         locs_embeddings = torch.cat([locs_embeddings_sin, locs_embeddings_cos], dim=-1) #RxTx3x2F_loc
@@ -40,4 +40,9 @@ class SinusoidalEmbeddings(nn.Module):
         dirs_embeddings = dirs_embeddings.permute(0, 1, 3, 2).contiguous() #RxTx2F_dirx2
         dirs_embeddings = dirs_embeddings.view(dirs_embeddings.shape[0], dirs_embeddings.shape[1], -1) #RxTx4F_dir
         
-        return locs_embeddings, dirs_embeddings
+        #create a dictionary of embeddings
+        embeddings = {}
+        embeddings['locs'] = locs_embeddings
+        embeddings['dirs'] = dirs_embeddings
+        
+        return embeddings

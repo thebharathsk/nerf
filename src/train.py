@@ -40,8 +40,8 @@ class NeRFEngine(L.LightningModule):
         self.model_fine = get_model(config)
         
         #initialize loss function
-        self.loss_fn_coarse = get_loss(config)
-        self.loss_fn_fine = get_loss(config)
+        self.loss_fn_coarse = get_loss(config, tag='coarse')
+        self.loss_fn_fine = get_loss(config, tag='fine')
         
         #log begging of training
         self.log_file.info(f'Starting experiment with id {self.config["exp"]["id"]}')
@@ -51,48 +51,55 @@ class NeRFEngine(L.LightningModule):
     def training_step(self, batch, batch_idx):
         #STEP 1: forward pass through coarse model
         #sample along rays
-        locs, dirs, t_sampled = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
+        samples_coarse = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
         
         #get embeddings
-        locs_emb, dirs_emb = self.embeddings_coarse(locs, dirs)
+        embeddings_coarse = self.embeddings_coarse(samples_coarse)
         
         #pass through model
-        sigma, rgb = self.model_coarse(locs_emb, dirs_emb)
+        outputs_coarse = self.model_coarse(embeddings_coarse)
         
         #get rendered colors
-        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, batch['ray_d'], add_sigma_noise=True)
+        renders_coarse = render(samples_coarse, outputs_coarse, add_sigma_noise=True)
         
         #compute loss
-        loss_coarse = self.loss_fn_coarse(rgb_rendered, batch['ray_rgb'])
+        loss_coarse = self.loss_fn_coarse(batch, samples_coarse, renders_coarse)
         
         #STEP 2: forward pass through fine model
         #sample along rays
-        locs_fine, dirs_fine, t_sampled_fine = sampler_fine(batch, t_sampled, weights.detach(), self.config['hyperparams']['num_samples_fine'])
+        samples_fine = sampler_fine(batch, samples_coarse, renders_coarse, self.config['hyperparams']['num_samples_fine'])
         
         #get embeddings
-        locs_emb_fine, dirs_emb_fine = self.embeddings_fine(locs_fine, dirs_fine)
+        embeddings_fine = self.embeddings_fine(samples_fine)
         
         #pass through model
-        sigma_fine, rgb_fine = self.model_fine(locs_emb_fine, dirs_emb_fine)
+        outputs_fine = self.model_fine(embeddings_fine)
         
         #get rendered colors
-        rgb_rendered_fine, _, _, _ = render(rgb_fine, sigma_fine, t_sampled_fine, batch['ray_d'], add_sigma_noise=True)
+        renders_fine = render(samples_fine, outputs_fine, add_sigma_noise=True)
         
         #compute loss
-        loss_fine = self.loss_fn_fine(rgb_rendered_fine, batch['ray_rgb'])
+        loss_fine = self.loss_fn_fine(batch, samples_fine, renders_fine)
         
-        #compute total loss
-        loss = loss_coarse + loss_fine
+        #concatenate loss
+        loss_dict = {}
+        loss_dict.update(loss_coarse)
+        loss_dict.update(loss_fine)
+        
+        #add loss
+        loss_total = sum(loss_dict.values())
+        
+        #add prefix to loss dictionary
+        loss_dict = {f"train/{key}": value for key, value in loss_dict.items()}
         
         #log loss
-        self.log('train/l_coarse', loss_coarse, prog_bar=True, on_step=True, on_epoch=False)
-        self.log('train/l_fine', loss_fine, prog_bar=True, on_step=True, on_epoch=False)
-        self.log('train/l_total', loss, on_step=True, on_epoch=False)
+        self.log_dict(loss_dict, prog_bar=False, on_step=True, on_epoch=False)
+        self.log("train/loss_total", loss_total, prog_bar=True, on_step=True, on_epoch=False)
         
         # log learning rate
         self.log("train/lr", self.trainer.optimizers[0].param_groups[0]['lr'], on_step=True)
         
-        return loss
+        return loss_total
     
     # save checkpoints at the end of epochs
     def on_train_epoch_end(self):
@@ -128,54 +135,58 @@ class NeRFEngine(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         #STEP 1: forward pass through coarse model
         #sample along rays
-        locs, dirs, t_sampled = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
+        samples_coarse = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
         
         #get embeddings
-        locs_emb, dirs_emb = self.embeddings_coarse(locs, dirs)
+        embeddings_coarse = self.embeddings_coarse(samples_coarse)
         
         #pass through model
-        sigma, rgb = self.model_coarse(locs_emb, dirs_emb)
+        outputs_coarse = self.model_coarse(embeddings_coarse)
         
         #get rendered colors
-        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, batch['ray_d'])
+        renders_coarse = render(samples_coarse, outputs_coarse)
         
         #compute loss
-        loss_coarse = self.loss_fn_coarse(rgb_rendered, batch['ray_rgb'])
+        loss_coarse = self.loss_fn_coarse(batch, samples_coarse, renders_coarse)
         
         #STEP 2: forward pass through fine model
         #sample along rays
-        locs_fine, dirs_fine, t_sampled_fine = sampler_fine(batch, t_sampled, weights.detach(), self.config['hyperparams']['num_samples_fine'])
+        samples_fine = sampler_fine(batch, samples_coarse, renders_coarse, self.config['hyperparams']['num_samples_fine'])
         
         #get embeddings
-        locs_emb_fine, dirs_emb_fine = self.embeddings_fine(locs_fine, dirs_fine)
+        embeddings_fine = self.embeddings_fine(samples_fine)
         
         #pass through model
-        sigma_fine, rgb_fine = self.model_fine(locs_emb_fine, dirs_emb_fine)
+        outputs_fine = self.model_fine(embeddings_fine)
         
         #get rendered colors
-        rgb_rendered_fine, depth_rendered_fine, acc_rendered_fine, _ = render(rgb_fine, sigma_fine, t_sampled_fine, batch['ray_d'])
+        renders_fine = render(samples_fine, outputs_fine)
         
         #compute loss
-        loss_fine = self.loss_fn_fine(rgb_rendered_fine, batch['ray_rgb'])
+        loss_fine = self.loss_fn_fine(batch, samples_fine, renders_fine)
         
-        #compute total loss
-        loss = loss_coarse + loss_fine
+        #concatenate loss
+        loss_dict = {}
+        loss_dict.update(loss_coarse)
+        loss_dict.update(loss_fine)
         
-        #compute total loss
-        loss = loss_coarse + loss_fine
+        #add loss
+        loss_total = sum(loss_dict.values())
+        
+        #add prefix to loss dictionary
+        loss_dict = {f"val/{key}": value for key, value in loss_dict.items()}
         
         #log loss
-        self.log('val/loss_coarse', loss_coarse, on_step=False, on_epoch=True)
-        self.log('val/loss_fine', loss_fine, on_step=False, on_epoch=True)
-        self.log('val/loss_total', loss, on_step=False, on_epoch=True)
+        self.log_dict(loss_dict, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("val/loss_total", loss_total, prog_bar=False, on_step=False, on_epoch=True)
                         
         #transfer colors and depths to image
         batch_ids = batch['ray_id']
-        self.val_reconstructed_image[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = rgb_rendered_fine
-        self.val_reconstructed_depth[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = depth_rendered_fine
-        self.val_reconstructed_accumulation[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = acc_rendered_fine
+        self.val_reconstructed_image[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = renders_fine['rgb']
+        self.val_reconstructed_depth[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = renders_fine['depth']
+        self.val_reconstructed_accumulation[batch_ids[:,0], batch_ids[:,1], batch_ids[:,2]] = renders_fine['acc']
         
-        return loss
+        return loss_total
 
     def on_validation_epoch_end(self):        
         #save image
@@ -205,45 +216,52 @@ class NeRFEngine(L.LightningModule):
     def test_step(self, batch, batch_idx):
         #STEP 1: forward pass through coarse model
         #sample along rays
-        locs, dirs, t_sampled = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
+        samples_coarse = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
         
         #get embeddings
-        locs_emb, dirs_emb = self.embeddings_coarse(locs, dirs)
+        embeddings_coarse = self.embeddings_coarse(samples_coarse)
         
         #pass through model
-        sigma, rgb = self.model_coarse(locs_emb, dirs_emb)
+        outputs_coarse = self.model_coarse(embeddings_coarse)
         
         #get rendered colors
-        rgb_rendered, _, _, weights = render(rgb, sigma, t_sampled, batch['ray_d'])
+        renders_coarse = render(samples_coarse, outputs_coarse)
         
         #compute loss
-        loss_coarse = self.loss_fn_coarse(rgb_rendered, batch['ray_rgb'])
+        loss_coarse = self.loss_fn_coarse(batch, samples_coarse, renders_coarse)
         
         #STEP 2: forward pass through fine model
         #sample along rays
-        locs_fine, dirs_fine, t_sampled_fine = sampler_fine(batch, t_sampled, weights.detach(), self.config['hyperparams']['num_samples_fine'])
+        samples_fine = sampler_fine(batch, samples_coarse, renders_coarse, self.config['hyperparams']['num_samples_fine'])
         
         #get embeddings
-        locs_emb_fine, dirs_emb_fine = self.embeddings_fine(locs_fine, dirs_fine)
+        embeddings_fine = self.embeddings_fine(samples_fine)
         
         #pass through model
-        sigma_fine, rgb_fine = self.model_fine(locs_emb_fine, dirs_emb_fine)
+        outputs_fine = self.model_fine(embeddings_fine)
         
         #get rendered colors
-        rgb_rendered_fine, _, _, _ = render(rgb_fine, sigma_fine, t_sampled_fine, batch['ray_d'])
+        renders_fine = render(samples_fine, outputs_fine)
         
         #compute loss
-        loss_fine = self.loss_fn_fine(rgb_rendered_fine, batch['ray_rgb'])
+        loss_fine = self.loss_fn_fine(batch, samples_fine, renders_fine)
         
-        #compute total loss
-        loss = loss_coarse + loss_fine
+        #concatenate loss
+        loss_dict = {}
+        loss_dict.update(loss_coarse)
+        loss_dict.update(loss_fine)
+        
+        #add loss
+        loss_total = sum(loss_dict.values())
+        
+        #add prefix to loss dictionary
+        loss_dict = {f"test/{key}": value for key, value in loss_dict.items()}
         
         #log loss
-        self.log('test/loss_coarse', loss_coarse, on_step=False, on_epoch=True)
-        self.log('test/loss_fine', loss_fine, on_step=False, on_epoch=True)
-        self.log('test/loss_total', loss, on_step=False, on_epoch=True)
+        self.log_dict(loss_dict, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("test/loss_total", loss_total, prog_bar=False, on_step=False, on_epoch=True)
         
-        return loss
+        return loss_total
     
     def configure_optimizers(self):
         if self.config['optimizer']['name'] == "adam":
