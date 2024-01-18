@@ -287,7 +287,7 @@ def main(config):
     
     # create root folder
     exp_id = get_time_string()
-    exp_dir = os.path.join(config['exp']['root'], exp_id + '_' + config['exp']['name'])
+    exp_dir = os.path.join(config['exp']['root'], 'exps', exp_id + '_' + config['exp']['name'])
     config['exp']['id'] = exp_id
     config['exp']['dir'] = exp_dir
     wandb_path = os.path.join(exp_dir, 'wandb')
@@ -305,7 +305,7 @@ def main(config):
     # log training script
     wandb_run = wandb_logger.experiment
     artifact = wandb.Artifact('train_script', type='code')
-    artifact.add_file('train.py')
+    artifact.add_file(os.path.join(config['exp']['root'], 'src', 'train.py'))
     wandb_run.log_artifact(artifact)
     
     #initialize lightning module

@@ -1,6 +1,7 @@
 from loss.loss import MSE as MSE
 from loss.loss import L1 as L1
 from loss.loss import SigmaLoss as SigmaLoss
+from loss.loss import DepthLoss as DepthLoss
 from loss.loss import CompositeLoss
 
 def get_loss(config, tag='coarse'):
@@ -14,6 +15,7 @@ def get_loss(config, tag='coarse'):
     loss_fn['mse'] = MSE
     loss_fn['l1'] = L1
     loss_fn['sigma'] = SigmaLoss
+    loss_fn['depth'] = DepthLoss
     
     #create loss list
     loss_list = []

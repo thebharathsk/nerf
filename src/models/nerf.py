@@ -67,4 +67,3 @@ class NeRF(nn.Module):
         outputs['rgb'] = rgb
         
         return outputs
-        
