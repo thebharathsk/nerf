@@ -269,7 +269,7 @@ class NeRFEngine(L.LightningModule):
                                 lr=self.config['hyperparams']['lr'],
                                 betas=(0.9, 0.999))
             
-        lr_scheduler = StepLR(optimizer, step_size=1, gamma=0.95)
+        lr_scheduler = StepLR(optimizer, step_size=1, gamma=0.91)
         
         return [optimizer], [lr_scheduler]
                 

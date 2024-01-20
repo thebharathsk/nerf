@@ -1,7 +1,7 @@
 #experiment name
 exp:
-  root: /home/bharathsk/projects/nerf/exps/
-  name: dict_all
+  root: /home/bharathsk/projects/nerf/
+  name: drop_3_l1_loss
   offline_logging: False
 
 #hyperparameters
@@ -12,7 +12,7 @@ hyperparams:
   num_samples_coarse: 64
   num_samples_fine: 128
   iterations: 10000000
-  epochs: 6
+  epochs: 25
   num_workers: 24
 
 #dataset
@@ -20,26 +20,26 @@ data:
   downscale: 2
   train:
     name: colmap
-    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    image_path: /home/bharathsk/datasets/drop/frames/drop_3/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_3/sparse/0/
     imgs_list: NULL
     size: 10000000
   val:
     name: colmap
-    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    image_path: /home/bharathsk/datasets/drop/frames/drop_3/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_3/sparse/0/
     imgs_list: [30]
     size: NULL
   test:
     name: colmap
-    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    image_path: /home/bharathsk/datasets/drop/frames/drop_3/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_3/sparse/0/
     imgs_list: [30]
     size: NULL
   analysis:
     name: colmap
-    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    image_path: /home/bharathsk/datasets/drop/frames/drop_3/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_3/sparse/0/
     imgs_list: [30]
     size: NULL
 
@@ -58,8 +58,8 @@ model:
 
 #loss functions:
 loss:
-  names: ['mse']
-  weights: [1.0]
+  names: ['l1', 'depth']
+  weights: [1.0, 0.1]
 
 #optimizer
 optimizer:

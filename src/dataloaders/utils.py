@@ -30,9 +30,13 @@ def rodrigues_formula(old_dir, new_dir):
 def get_intrinsics(workspace_path):
     #extract data
     cameras = read_cameras_binary(os.path.join(workspace_path, 'cameras.bin'))
-    camera_params = cameras[1].params
-    h = cameras[1].height
-    w = cameras[1].width
+    
+    #get the camera id
+    cam_id = list(cameras.keys())[0]
+    
+    camera_params = cameras[cam_id].params
+    h = cameras[cam_id].height
+    w = cameras[cam_id].width
     
     #create intrinsics matrix
     intrinsics = np.eye(3)
@@ -263,6 +267,8 @@ def get_ray_data(image_path, workspace_path, downscale):
     for i in tqdm(range(num_cameras)):
         #get visibility mask for camera
         visibility_mask = visibility[:, i] == 1
+        
+        print('Camera: ', i, ' num points ', visibility_mask.sum(),  ' total points ', visibility.shape[0])
         
         #get visible points
         visible_points = points3d_transformed[visibility_mask] # (num_visible_points, 3)
