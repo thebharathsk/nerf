@@ -268,8 +268,6 @@ def get_ray_data(image_path, workspace_path, downscale):
         #get visibility mask for camera
         visibility_mask = visibility[:, i] == 1
         
-        print('Camera: ', i, ' num points ', visibility_mask.sum(),  ' total points ', visibility.shape[0])
-        
         #get visible points
         visible_points = points3d_transformed[visibility_mask] # (num_visible_points, 3)
                 

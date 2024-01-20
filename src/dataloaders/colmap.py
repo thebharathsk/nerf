@@ -26,12 +26,17 @@ class COLMAP(Dataset):
             for key in self.rays.keys():
                 self.rays[key] = self.rays[key][self.imgs_list]
         
+        #keep track of valid depth pixels
+        self.valid_depth = torch.where(self.rays['ray_term'] > 0)
+        self.num_valid_depth = len(self.valid_depth[0])
+        
         #some useful variables
         self.num_cameras, self.h, self.w  = self.rays['ray_o'].shape[:3]
         
+        
         #size of dataset
         self.is_partial_data = config['data'][split]['size'] is not None
-        self.size = min(config['data'][split]['size'], self.num_cameras*self.h*self.w) if self.is_partial_data else self.num_cameras*self.h*self.w 
+        self.size = min(config['data'][split]['size'], self.num_cameras*self.h*self.w) if self.is_partial_data else self.num_cameras*self.h*self.w
         
     def __len__(self):
         """Length of dataset
@@ -51,13 +56,31 @@ class COLMAP(Dataset):
         x = (idx - cam_id*self.h*self.w)%self.w
         
         #gather data
-        batch = {}
-        batch['ray_id'] = torch.tensor([cam_id, y, x])
-        batch['ray_o'] = self.rays['ray_o'][cam_id, y, x]
-        batch['ray_d'] = self.rays['ray_d'][cam_id, y, x]
-        batch['ray_rgb'] = self.rays['ray_rgb'][cam_id, y, x]
-        batch['ray_bds'] = self.rays['ray_bds'][cam_id, y, x]
-        batch['ray_term'] = self.rays['ray_term'][cam_id, y, x]
-        batch['reproj_error'] = self.rays['reproj_error'][cam_id, y, x]
+        batch_color = {}
+        batch_color['ray_id'] = torch.tensor([cam_id, y, x])
+        batch_color['ray_o'] = self.rays['ray_o'][cam_id, y, x]
+        batch_color['ray_d'] = self.rays['ray_d'][cam_id, y, x]
+        batch_color['ray_rgb'] = self.rays['ray_rgb'][cam_id, y, x]
+        batch_color['ray_bds'] = self.rays['ray_bds'][cam_id, y, x]
+        batch_color['ray_term'] = self.rays['ray_term'][cam_id, y, x]
+        batch_color['reproj_error'] = self.rays['reproj_error'][cam_id, y, x]
+        batch_color['color_data'] = 1
+        batch_color['depth_data'] = 0
+                
+        #gather a valid depth pixel
+        #sample random depth pixel
+        depth_idx = np.random.randint(0, self.num_valid_depth)
+        depth_cam_id, depth_y, depth_x = self.valid_depth[0][depth_idx], self.valid_depth[1][depth_idx], self.valid_depth[2][depth_idx]
         
-        return batch
+        batch_depth = {}
+        batch_depth['ray_id'] = torch.tensor([depth_cam_id, depth_y, depth_x])
+        batch_depth['ray_o'] = self.rays['ray_o'][depth_cam_id, depth_y, depth_x]
+        batch_depth['ray_d'] = self.rays['ray_d'][depth_cam_id, depth_y, depth_x]
+        batch_depth['ray_rgb'] = self.rays['ray_rgb'][depth_cam_id, depth_y, depth_x]
+        batch_depth['ray_bds'] = self.rays['ray_bds'][depth_cam_id, depth_y, depth_x]
+        batch_depth['ray_term'] = self.rays['ray_term'][depth_cam_id, depth_y, depth_x]
+        batch_depth['reproj_error'] = self.rays['reproj_error'][depth_cam_id, depth_y, depth_x]
+        batch_depth['color_data'] = 0
+        batch_depth['depth_data'] = 1
+        
+        return batch_color, batch_depth

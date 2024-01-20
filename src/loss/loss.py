@@ -7,7 +7,10 @@ class MSE(nn.Module):
         self.criterion = nn.MSELoss()
 
     def forward(self, batch, samples, renders):
-        return self.criterion(renders['rgb'], batch['ray_rgb'])
+        #get a mask for color data
+        mask = batch['color_data'] == 1
+        
+        return self.criterion(renders['rgb'][mask], batch['ray_rgb'][mask])
     
 
 class L1(nn.Module):
@@ -16,7 +19,10 @@ class L1(nn.Module):
         self.criterion = nn.L1Loss()
 
     def forward(self, batch, samples, renders):
-        return self.criterion(renders['rgb'], batch['ray_rgb'])
+        #get a mask for color data
+        mask = batch['color_data'] == 1
+        
+        return self.criterion(renders['rgb'][mask], batch['ray_rgb'][mask])
 
 class SigmaLoss(nn.Module):
     def __init__(self, config):
@@ -75,7 +81,7 @@ class DepthLoss(nn.Module):
         reproj_error = batch['reproj_error'] #Rx1
         
         #find valid samples
-        mask = reproj_error[...,0] != -1 #R
+        mask = batch['depth_data'] == 1 #R
         
         #if no valid samples, return 0
         if torch.sum(mask) == 0:

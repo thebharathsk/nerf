@@ -19,6 +19,9 @@ def main(config):
     #initialize dataloaders
     train_dataloader = get_dataloader('train', config)
     
+    #get a batch from dataloader
+    batch_color, batch_depth = next(iter(train_dataloader))
+    
     # #access dataset from the dataloader
     # dataset = train_dataloader.dataset
     

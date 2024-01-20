@@ -49,6 +49,14 @@ class NeRFEngine(L.LightningModule):
         print(f'PID = {os.getpid()}')
         
     def training_step(self, batch, batch_idx):
+        #unpack color and depth batches
+        batch_color, batch_depth = batch
+        
+        #concatenate color and depth batches along the batch dimension
+        batch = {}
+        for key in batch_color.keys():
+            batch[key] = torch.cat([batch_color[key], batch_depth[key]], dim=0)
+        
         #STEP 1: forward pass through coarse model
         #sample along rays
         samples_coarse = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
@@ -133,6 +141,14 @@ class NeRFEngine(L.LightningModule):
         self.val_reconstructed_accumulation.requires_grad = False
     
     def validation_step(self, batch, batch_idx):
+        #unpack color and depth batches
+        batch_color, batch_depth = batch
+        
+        #concatenate color and depth batches along the batch dimension
+        batch = {}
+        for key in batch_color.keys():
+            batch[key] = torch.cat([batch_color[key], batch_depth[key]], dim=0)
+            
         #STEP 1: forward pass through coarse model
         #sample along rays
         samples_coarse = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
@@ -214,6 +230,14 @@ class NeRFEngine(L.LightningModule):
             cv2.imwrite(os.path.join(self.config['exp']['dir'], f'train_acc_{acc_num}.png'), acc_np_colormaped)
 
     def test_step(self, batch, batch_idx):
+        #unpack color and depth batches
+        batch_color, batch_depth = batch
+        
+        #concatenate color and depth batches along the batch dimension
+        batch = {}
+        for key in batch_color.keys():
+            batch[key] = torch.cat([batch_color[key], batch_depth[key]], dim=0)
+            
         #STEP 1: forward pass through coarse model
         #sample along rays
         samples_coarse = sampler_coarse(batch, self.config['hyperparams']['num_samples_coarse'])
