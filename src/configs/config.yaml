@@ -19,26 +19,26 @@ data:
   downscale: 2
   train:
     name: colmap
-    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    image_path: /home/bharathsk/datasets/drop/frames/drop_6/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_6/sparse/0/
     imgs_list: NULL
     size: 10000000
   val:
     name: colmap
-    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    image_path: /home/bharathsk/datasets/drop/frames/drop_6/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_6/sparse/0/
     imgs_list: [30]
     size: NULL
   test:
     name: colmap
-    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    image_path: /home/bharathsk/datasets/drop/frames/drop_6/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_6/sparse/0/
     imgs_list: [30]
     size: NULL
   analysis:
     name: colmap
-    image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    image_path: /home/bharathsk/datasets/drop/frames/drop_6/
+    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_6/sparse/0/
     imgs_list: [30]
     size: NULL
 
