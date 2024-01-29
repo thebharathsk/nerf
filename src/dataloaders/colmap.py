@@ -69,7 +69,7 @@ class COLMAP(Dataset):
                 
         #gather a valid depth pixel
         #sample random depth pixel
-        depth_idx = np.random.randint(0, self.num_valid_depth)
+        depth_idx = idx%self.num_valid_depth
         depth_cam_id, depth_y, depth_x = self.valid_depth[0][depth_idx], self.valid_depth[1][depth_idx], self.valid_depth[2][depth_idx]
         
         batch_depth = {}

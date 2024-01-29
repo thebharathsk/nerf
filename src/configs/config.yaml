@@ -1,7 +1,7 @@
 #experiment name
 exp:
   root: /home/bharathsk/projects/nerf/
-  name: drop_2_depth_dataloader_25epochs
+  name: drop_2_step_200k
   offline_logging: False
 
 #hyperparameters
@@ -11,7 +11,8 @@ hyperparams:
   test_num_rays: 4500
   num_samples_coarse: 64
   num_samples_fine: 128
-  epochs: 25
+  train_iters: 200000
+  val_freq: 2500
   num_workers: 24
 
 #dataset
@@ -20,25 +21,25 @@ data:
   train:
     name: colmap
     image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    sparse_recon_path: /home/bharathsk/projects/super-colmap/colmap_loftr/sparse/0
     imgs_list: NULL
-    size: 10000000
+    size: NULL
   val:
     name: colmap
     image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    sparse_recon_path: /home/bharathsk/projects/super-colmap/colmap_loftr/sparse/0
     imgs_list: [30]
     size: NULL
   test:
     name: colmap
     image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    sparse_recon_path: /home/bharathsk/projects/super-colmap/colmap_loftr/sparse/0
     imgs_list: [30]
     size: NULL
   analysis:
     name: colmap
     image_path: /home/bharathsk/datasets/drop/frames/drop_2/
-    sparse_recon_path: /home/bharathsk/datasets/drop/colmap/drop_2/sparse/0/
+    sparse_recon_path: /home/bharathsk/projects/super-colmap/colmap_loftr/sparse/0
     imgs_list: [30]
     size: NULL
 

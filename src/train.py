@@ -292,8 +292,13 @@ class NeRFEngine(L.LightningModule):
             optimizer = optim.Adam(list(self.model_coarse.parameters()) + list(self.model_fine.parameters()), \
                                 lr=self.config['hyperparams']['lr'],
                                 betas=(0.9, 0.999))
-            
-        lr_scheduler = StepLR(optimizer, step_size=1, gamma=0.91)
+        
+        gamma = (0.1)**(1000/self.config['hyperparams']['train_iters'])
+        lr_scheduler = {
+            'scheduler': StepLR(optimizer, step_size=1, gamma=gamma),
+            'interval': 'step',
+            'frequency': 1000
+        }
         
         return [optimizer], [lr_scheduler]
                 
@@ -336,11 +341,13 @@ def main(config):
     nerf_engine = NeRFEngine(config)
     
     #initialize trainer
-    trainer = L.Trainer(max_epochs=config['hyperparams']['epochs'],
-                         accelerator='cuda', 
-                         devices=[0], 
-                         precision='16',
-                         logger=wandb_logger
+    trainer = L.Trainer(max_steps=config['hyperparams']['train_iters'],
+                        val_check_interval=config['hyperparams']['val_freq'],
+                        check_val_every_n_epoch=None,
+                        accelerator='cuda', 
+                        devices=[0], 
+                        precision='16',
+                        logger=wandb_logger
                         )
     
     #start training
