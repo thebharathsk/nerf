@@ -6,7 +6,6 @@ import immatch
 import numpy as np
 import cv2 as cv2
 import matplotlib.pyplot as plt
-import open3d as o3d
 from immatch.utils import plot_matches
 from tqdm import tqdm
 
