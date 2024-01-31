@@ -1,7 +1,7 @@
 #experiment name
 exp:
   root: /home/bharathsk/projects/nerf/
-  name: drop_2_step_200k
+  name: drop_2_depth_loss_0.01
   offline_logging: False
 
 #hyperparameters
@@ -11,7 +11,7 @@ hyperparams:
   test_num_rays: 4500
   num_samples_coarse: 64
   num_samples_fine: 128
-  train_iters: 200000
+  train_iters:  200000
   val_freq: 2500
   num_workers: 24
 
@@ -59,7 +59,7 @@ model:
 #loss functions:
 loss:
   names: ['l1', 'depth']
-  weights: [1.0, 0.1]
+  weights: [1, 0.01]
 
 #optimizer
 optimizer:

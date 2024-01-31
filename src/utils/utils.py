@@ -202,5 +202,6 @@ def render(samples, outputs, add_sigma_noise=False, plot=False):
     rendered['depth'] = depth_rendered
     rendered['acc'] = accumulation_rendered
     rendered['weights'] = weights
+    rendered['sigma'] = sigma
 
     return rendered

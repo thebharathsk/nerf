@@ -174,13 +174,13 @@ def transform_3d(extrinsics, points3d):
     center = (lower_bounds + upper_bounds) / 2
     
     #find scale factor along each axis
-    scale = 2/(upper_bounds - lower_bounds + 1e-6)
+    scale = 2/(np.max(upper_bounds - lower_bounds) + 1e-6)
     
     #find transform to fit volume into cube of size 2
     cube_transform = np.eye(4)
-    cube_transform[0,0] = scale[0]
-    cube_transform[1,1] = scale[1]
-    cube_transform[2,2] = scale[2]
+    cube_transform[0,0] = scale#[0]
+    cube_transform[1,1] = scale#[1]
+    cube_transform[2,2] = scale#[2]
     cube_transform[0:3, 3] = -center*scale
     
     #transform extrinsics and points according to transform
@@ -192,7 +192,11 @@ def transform_3d(extrinsics, points3d):
     #find transformation from original volume to transformed volume
     overall_transformation = cube_transform @ motion_transformation
     
-    return extrinsics, points3d, overall_transformation
+    #identify bounds in transformed space
+    lower_bounds_new = scale*(lower_bounds - center)
+    upper_bounds_new = scale*(upper_bounds - center)
+    
+    return extrinsics, points3d, overall_transformation, (lower_bounds_new, upper_bounds_new)
 
 def get_ray_data(image_path, workspace_path, downscale):
     #get intrinsics, extrinsics, points3d and image paths
@@ -210,13 +214,16 @@ def get_ray_data(image_path, workspace_path, downscale):
     w = int(w/downscale)
     
     #find transform to fit point cloud volume into cube of size 2
-    extrinsics_transformed, points3d_transformed, transform = transform_3d(extrinsics, points3d)
+    extrinsics_transformed, points3d_transformed, transform, (lower_bounds, upper_bounds) = transform_3d(extrinsics, points3d)
     
     #compute camera to world transformation
     extrinsics_transformed_inv = np.linalg.inv(extrinsics_transformed)
 
-    #filter points outside the cube
-    pts_mask = np.all(points3d_transformed >= -1, axis=1) & np.all(points3d_transformed <= 1, axis=1)
+    #filter points outside the cuboid
+    pts_mask_x = (points3d_transformed[:,0] >= lower_bounds[0]) & (points3d_transformed[:,0] <= upper_bounds[0])
+    pts_mask_y = (points3d_transformed[:,1] >= lower_bounds[1]) & (points3d_transformed[:,1] <= upper_bounds[1])
+    pts_mask_z = (points3d_transformed[:,2] >= lower_bounds[2]) & (points3d_transformed[:,2] <= upper_bounds[2])
+    pts_mask = pts_mask_x & pts_mask_y & pts_mask_z
     points3d_transformed = points3d_transformed[pts_mask]
     visibility = visibility[pts_mask]
     error = error[pts_mask]
@@ -244,8 +251,8 @@ def get_ray_data(image_path, workspace_path, downscale):
     rays_d = np.transpose(rays_d, (0,2,3,1)) # (num_cameras, h, w, 3)
     
     #compute min and max t values
-    t_min = (-1 - rays_o[...,2:])/rays_d[...,2:]
-    t_max = (1 - rays_o[...,2:])/rays_d[...,2:]
+    t_min = (lower_bounds[2] - rays_o[...,2:])/rays_d[...,2:]
+    t_max = (upper_bounds[2] - rays_o[...,2:])/rays_d[...,2:]
     t_min = np.maximum(t_min, 0)
     t_max = np.maximum(t_max, 0)
     

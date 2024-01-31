@@ -98,6 +98,17 @@ class DepthLoss(nn.Module):
         
         return depth_loss
 
+class SparsityLoss(nn.Module):
+    def __init__(self, config):
+        super(SparsityLoss, self).__init__()
+        self.criterion = nn.MSELoss()
+    
+    def forward(self, batch, samples, renders):
+        #compute l0 norm of alpha
+        loss = torch.norm(renders['sigma'], p=0)/renders['sigma'].numel()
+        
+        return loss
+
 class CompositeLoss(nn.Module):
     def __init__(self, loss_list, tag):
         """Constructor for MSE Loss
